@@ -386,7 +386,7 @@ function App() {
               <div className="lesson-step-card">
                 {currentStep.type === 'explanation' && <><span className="step-type"><BookOpen size={16} />{t.objective}</span><h2>{currentStep.heading}</h2><p className="lesson-explanation">{currentStep.body}</p></>}
                 {currentStep.type === 'example' && <><span className="step-type"><Volume2 size={16} />{t.objective}</span><div className="example-english">{currentStep.english}</div><p className="example-arabic">{currentStep.arabic}</p>{currentStep.note && <div className="note-box">{currentStep.note}</div>}</>}
-                {currentStep.type === 'choice' && <ChoiceActivity step={currentStep} onComplete={() => void recordStep(currentStep.id)} t={t} />}
+                {currentStep.type === 'choice' && <ChoiceActivity step={currentStep} objectiveId={activeLesson.objectives[0]?.id ?? currentStep.questionId} onAttempt={(correct) => void recordChoiceAttempt(currentStep.questionId, correct, currentStep.id)} onComplete={() => void recordStep(currentStep.id)} t={t} />}
               </div>
               {currentStep.type !== 'choice' && <button className="button button-primary next-button" onClick={() => void advanceStep()}>{stepIndex === activeLesson.steps.length - 1 ? t.finish : t.next}<ArrowLeft size={17} /></button>}
               {currentStep.type === 'choice' && stepIndex < activeLesson.steps.length - 1 && <button className="button button-primary next-button" disabled={!completed.includes(currentStep.id)} onClick={() => setStepIndex((value) => value + 1)}>{t.next}<ArrowLeft size={17} /></button>}
