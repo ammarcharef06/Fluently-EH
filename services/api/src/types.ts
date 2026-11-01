@@ -3,6 +3,7 @@ export type SessionClaims = { sub: string; roles?: AdminRole[]; email_verified?:
 
 export interface ObjectBucket {
   get(key: string): Promise<{ body: ReadableStream; httpEtag: string } | null>;
+  put(key: string, value: string | ReadableStream, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
 }
 export interface Env {
   APP_ENV: 'development' | 'production';
