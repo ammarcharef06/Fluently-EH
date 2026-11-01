@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.tsbuildinfo
+apps/android/android/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/Cargo.lock
