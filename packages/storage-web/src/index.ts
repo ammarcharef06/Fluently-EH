@@ -67,10 +67,23 @@ export async function listReviewStates(): Promise<ReviewRecord[]> {
   const db = await openFluentlyDB();
   return db.getAll('reviews');
 }
+export async function saveSetting(key: string, value: string | number | boolean): Promise<void> {
+  const db = await openFluentlyDB();
+  await db.put('settings', value, key);
+}
+export async function readSetting(key: string): Promise<string | number | boolean | undefined> {
+  const db = await openFluentlyDB();
+  return db.get('settings', key);
+}
 export async function clearLocalLearningData(): Promise<void> {
   const db = await openFluentlyDB();
-  const tx = db.transaction(['progress', 'outbox', 'reviews'], 'readwrite');
-  await Promise.all([tx.objectStore('progress').clear(), tx.objectStore('outbox').clear(), tx.objectStore('reviews').clear()]);
+  const tx = db.transaction(['progress', 'outbox', 'reviews', 'settings'], 'readwrite');
+  await Promise.all([
+    tx.objectStore('progress').clear(),
+    tx.objectStore('outbox').clear(),
+    tx.objectStore('reviews').clear(),
+    tx.objectStore('settings').clear()
+  ]);
   await tx.done;
 }
 export function requestPersistentStorage(): Promise<boolean> {
