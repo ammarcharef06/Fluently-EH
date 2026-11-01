@@ -13,8 +13,10 @@ describe('API safety defaults', () => {
     const response = await app.request('/v1/auth/login', {}, { APP_ENV: 'development' });
     expect(response.status).toBe(503);
   });
-  it('does not allow sync without a session', async () => {
-    const response = await app.request('/v1/sync/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operations: [] }) }, { APP_ENV: 'development' });
+  it('does not allow sync without a configured identity', async () => {
+    const response = await app.request('/v1/sync/push', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operations: [] })
+    }, { APP_ENV: 'development' });
     expect(response.status).toBe(503);
   });
 });
