@@ -8,9 +8,11 @@ on:
     branches:
       - main
       - implementation/full-build
+  paths-ignore:
+    - package-lock.json
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: fluently-ci-${{ github.ref }}
@@ -29,8 +31,11 @@ jobs:
         with:
           node-version: "22.16.0"
 
-      - name: Install dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Generate deterministic dependency lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: TypeScript checks
         run: npm run typecheck
@@ -44,8 +49,26 @@ jobs:
       - name: Secret-pattern scan
         run: npm run security:check
 
+      - name: Dependency vulnerability audit
+        run: npm audit --audit-level=high
+
       - name: Validate curriculum drafts
         run: npm run content:validate
 
       - name: Build learner and admin applications
         run: npm run build
+
+      - name: Commit generated lockfile on implementation branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/implementation/full-build'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo 'Lockfile is unchanged.'
+            exit 0
+          fi
+          git commit -m 'chore: lock npm workspace dependencies'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
