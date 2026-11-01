@@ -90,8 +90,9 @@ app.get('/v1/curriculum/manifest', requireSession, async (c) => {
     const rows = await sql.unsafe(
       "select id from curriculum_releases where package_id='fluently.core' and status='published' order by published_at desc limit 1"
     );
-    if (!rows.length) return c.json({ error: 'no_published_curriculum' }, 404);
-    const object = await bucket.get('published/' + rows[0].id + '/manifest.json');
+    const release = rows[0];
+    if (!release || typeof release.id !== 'string') return c.json({ error: 'no_published_curriculum' }, 404);
+    const object = await bucket.get('published/' + release.id + '/manifest.json');
     if (!object) return c.json({ error: 'published_manifest_missing' }, 503);
     return new Response(object.body, {
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=60', ETag: object.httpEtag }
@@ -111,8 +112,9 @@ app.get('/v1/curriculum/content.json', requireSession, async (c) => {
     const rows = await sql.unsafe(
       "select id from curriculum_releases where package_id='fluently.core' and status='published' order by published_at desc limit 1"
     );
-    if (!rows.length) return c.json({ error: 'no_published_curriculum' }, 404);
-    const object = await bucket.get('published/' + rows[0].id + '/content.json');
+    const release = rows[0];
+    if (!release || typeof release.id !== 'string') return c.json({ error: 'no_published_curriculum' }, 404);
+    const object = await bucket.get('published/' + release.id + '/content.json');
     if (!object) return c.json({ error: 'published_content_missing' }, 503);
     return new Response(object.body, {
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=60', ETag: object.httpEtag }
@@ -166,6 +168,7 @@ app.delete('/v1/me', requireSession, async (c) => {
       );
       return rows[0];
     });
+    if (!request) return c.json({ error: 'deletion_request_unavailable' }, 503);
     return c.json({ status: 'deletion_requested', requestId: request.id, requestedAt: request.requested_at }, 202);
   } catch {
     return c.json({ error: 'deletion_request_unavailable' }, 503);
