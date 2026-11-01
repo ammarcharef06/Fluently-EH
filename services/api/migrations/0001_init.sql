@@ -177,3 +177,194 @@ create table if not exists verification_tokens (
 
 -- RLS policies must be added alongside the deployment role strategy before production traffic.
 -- Keep all API queries user-scoped; the current development API does not connect without Hyperdrive.
+
+
+-- Row-level security v1.
+-- Every authenticated API transaction must set app.user_id using a verified session.
+-- Production must use a non-superuser database role; table owners bypass RLS unless FORCE is enabled.
+create or replace function fluently_current_user_id() returns uuid
+language sql stable
+as $$
+  select nullif(current_setting('app.user_id', true), '')::uuid
+$$;
+
+alter table app_users enable row level security;
+alter table app_users force row level security;
+drop policy if exists app_users_self on app_users;
+create policy app_users_self on app_users
+  for all using (id = fluently_current_user_id())
+  with check (id = fluently_current_user_id());
+
+alter table external_identities enable row level security;
+alter table external_identities force row level security;
+drop policy if exists external_identities_self on external_identities;
+create policy external_identities_self on external_identities
+  for all using (user_id = fluently_current_user_id())
+  with check (user_id = fluently_current_user_id());
+
+alter table employee_memberships enable row level security;
+alter table employee_memberships force row level security;
+drop policy if exists employee_memberships_self_read on employee_memberships;
+create policy employee_memberships_self_read on employee_memberships
+  for select using (user_id = fluently_current_user_id());
+
+alter table learning_profiles enable row level security;
+alter table learning_profiles force row level security;
+drop policy if exists learning_profiles_self on learning_profiles;
+create policy learning_profiles_self on learning_profiles
+  for all using (user_id = fluently_current_user_id())
+  with check (user_id = fluently_current_user_id());
+
+alter table user_sessions enable row level security;
+alter table user_sessions force row level security;
+drop policy if exists user_sessions_self on user_sessions;
+create policy user_sessions_self on user_sessions
+  for all using (user_id = fluently_current_user_id())
+  with check (user_id = fluently_current_user_id());
+
+alter table verification_tokens enable row level security;
+alter table verification_tokens force row level security;
+drop policy if exists verification_tokens_self on verification_tokens;
+create policy verification_tokens_self on verification_tokens
+  for all using (user_id = fluently_current_user_id())
+  with check (user_id = fluently_current_user_id());
+
+alter table learning_events enable row level security;
+alter table learning_events force row level security;
+drop policy if exists learning_events_self on learning_events;
+create policy learning_events_self on learning_events
+  for all using (user_id = fluently_current_user_id())
+  with check (user_id = fluently_current_user_id());
+
+alter table sync_operations enable row level security;
+alter table sync_operations force row level security;
+drop policy if exists sync_operations_self on sync_operations;
+create policy sync_operations_self on sync_operations
+  for all using (user_id = fluently_current_user_id())
+  with check (user_id = fluently_current_user_id());
+
+alter table review_states enable row level security;
+alter table review_states force row level security;
+drop policy if exists review_states_self on review_states;
+create policy review_states_self on review_states
+  for all using (user_id = fluently_current_user_id())
+  with check (user_id = fluently_current_user_id());
+
+alter table account_deletion_requests enable row level security;
+alter table account_deletion_requests force row level security;
+drop policy if exists account_deletion_requests_self on account_deletion_requests;
+create policy account_deletion_requests_self on account_deletion_requests
+  for all using (user_id = fluently_current_user_id())
+  with check (user_id = fluently_current_user_id());
+
+alter table content_items enable row level security;
+alter table content_items force row level security;
+drop policy if exists content_items_admin_read on content_items;
+create policy content_items_admin_read on content_items
+  for select using (
+    exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'editor', 'reviewer', 'publisher')
+    )
+  );
+drop policy if exists content_items_editor_insert on content_items;
+create policy content_items_editor_insert on content_items
+  for insert with check (
+    created_by = fluently_current_user_id()
+    and exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'editor')
+    )
+  );
+drop policy if exists content_items_admin_update on content_items;
+create policy content_items_admin_update on content_items
+  for update using (
+    exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'editor', 'reviewer', 'publisher')
+    )
+  ) with check (
+    exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'editor', 'reviewer', 'publisher')
+    )
+  );
+
+alter table content_versions enable row level security;
+alter table content_versions force row level security;
+drop policy if exists content_versions_admin_read on content_versions;
+create policy content_versions_admin_read on content_versions
+  for select using (
+    exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'editor', 'reviewer', 'publisher')
+    )
+  );
+drop policy if exists content_versions_editor_insert on content_versions;
+create policy content_versions_editor_insert on content_versions
+  for insert with check (
+    created_by = fluently_current_user_id()
+    and exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'editor')
+    )
+  );
+
+alter table curriculum_releases enable row level security;
+alter table curriculum_releases force row level security;
+drop policy if exists curriculum_releases_publisher on curriculum_releases;
+create policy curriculum_releases_publisher on curriculum_releases
+  for all using (
+    exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'publisher')
+    )
+  ) with check (
+    exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'publisher')
+    )
+  );
+
+alter table audit_events enable row level security;
+alter table audit_events force row level security;
+drop policy if exists audit_events_admin_read on audit_events;
+create policy audit_events_admin_read on audit_events
+  for select using (
+    exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role = 'owner'
+    )
+  );
+drop policy if exists audit_events_admin_insert on audit_events;
+create policy audit_events_admin_insert on audit_events
+  for insert with check (
+    actor_user_id = fluently_current_user_id()
+    and exists (
+      select 1 from employee_memberships m
+      where m.user_id = fluently_current_user_id()
+        and m.revoked_at is null
+        and m.role in ('owner', 'editor', 'reviewer', 'publisher')
+    )
+  );
+
+-- Do not grant app_users/session/table bypass rights to the Worker role.
+-- A separate migration/role grant must provision the application role after provider setup.
