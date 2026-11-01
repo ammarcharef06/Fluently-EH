@@ -1,0 +1,13 @@
+name = "fluently-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[vars]
+APP_ENV = "development"
+AUTH_ISSUER = ""
+AUTH_AUDIENCE = ""
+CORS_ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:5174"
+
+# Never put secrets or signing keys in this file.
+# Configure HYPERDRIVE and CURRICULUM_BUCKET only after no-card/no-billing review.
