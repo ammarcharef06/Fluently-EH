@@ -180,11 +180,22 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p h2a-evidence
-          echo "no" | avdmanager create avd --name h2a_api36 --package "system-images;android-36;google_apis;x86_64" --device "pixel_2" --force
+          EMULATOR_BIN="$ANDROID_HOME/emulator/emulator"
+          if [ ! -x "$EMULATOR_BIN" ]; then
+            echo "::error::Android emulator binary is missing at $EMULATOR_BIN"
+            exit 1
+          fi
+          "$EMULATOR_BIN" -version > h2a-evidence/emulator-version.txt 2>&1
+          test -f "$ANDROID_HOME/system-images/android-36/google_apis/x86_64/system.img"
+          echo "no" | avdmanager create avd --name h2a_api36 --package "system-images;android-36;google_apis;x86_64" --force
+          test -f "$HOME/.android/avd/h2a_api36.avd/config.ini" || {
+            echo "::error::Android Virtual Device configuration was not created"
+            exit 1
+          }
           BOOTED=0
           for ATTEMPT in 1 2; do
             echo "Starting emulator attempt ${ATTEMPT}/2"
-            emulator -avd h2a_api36 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -accel auto -no-snapshot -wipe-data > "h2a-evidence/emulator-attempt-${ATTEMPT}.log" 2>&1 &
+            "$EMULATOR_BIN" -avd h2a_api36 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -accel auto -no-snapshot -wipe-data > "h2a-evidence/emulator-attempt-${ATTEMPT}.log" 2>&1 &
             EMULATOR_PID=$!
             adb start-server
             DEADLINE=$((SECONDS + 900))
@@ -228,7 +239,6 @@ jobs:
 
           adb shell input keyevent 82 || true
           adb shell getprop ro.build.version.sdk > h2a-evidence/emulator-api-level.txt
-          emulator -version > h2a-evidence/emulator-version.txt 2>&1
 
       - name: Install APK and measure adb install time
         if: steps.emulator.outputs.booted == 'true'
