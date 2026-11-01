@@ -302,7 +302,7 @@ function App() {
         <nav className="side-nav" aria-label="Main navigation">
           <button className={screen === 'home' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('home')}><Home size={18} />{t.home}</button>
           <button className={screen === 'path' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('path')}><Layers3 size={18} />{t.path}</button>
-          <button className={screen === 'review' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('review')}><Clock3 size={18} />{t.review}<span className="nav-count">0</span></button>
+          <button className={screen === 'review' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('review')}><Clock3 size={18} />{t.review}<span className="nav-count">{dueReviews.length}</span></button>
           <button className={screen === 'settings' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('settings')}><Settings2 size={18} />{t.settings}</button>
         </nav>
         <div className="sidebar-bottom">
@@ -351,7 +351,20 @@ function App() {
           </section>
         )}
 
-        {screen === 'review' && <section className="page-section"><div className="page-intro"><span className="eyebrow">{t.review}</span><h1>{t.review}</h1><p>{t.reviewQueue}</p></div><EmptyState title={t.reviewQueue} text={t.emptyText} /></section>}
+        {screen === 'review' && (
+          <section className="page-section">
+            <div className="page-intro"><span className="eyebrow">{t.review}</span><h1>{t.review}</h1><p>{dueReviews.length ? 'لديك عناصر حان موعد مراجعتها.' : t.reviewQueue}</p></div>
+            {dueReviews.length === 0
+              ? <EmptyState title={t.reviewQueue} text={t.emptyText} />
+              : <div className="lesson-list">{dueReviews.map((item) => (
+                <article className="lesson-row" key={item.itemId}>
+                  <div className="lesson-row-icon"><Clock3 size={19} /></div>
+                  <div className="lesson-row-copy"><strong>{item.itemId}</strong><span>المراجعة المتباعدة · {item.intervalDays} يوم</span><small>{item.version}</small></div>
+                  <button className="button button-secondary" onClick={() => void startDueReview(item.itemId)}>ابدأ المراجعة</button>
+                </article>
+              ))}</div>}
+          </section>
+        )}
 
         {screen === 'settings' && (
           <section className="page-section"><div className="page-intro"><span className="eyebrow">{t.settings}</span><h1>{t.settings}</h1></div>
