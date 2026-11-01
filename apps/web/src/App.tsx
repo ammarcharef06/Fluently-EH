@@ -9,19 +9,22 @@ import { gradeChoice, type ChoiceQuestion } from '@fluently/domain';
 import {
   listLessonProgress, readLessonProgress, requestPersistentStorage, saveLessonProgress
 } from '@fluently/storage-web';
-import type { Lesson } from '@fluently/content-schema';
+import { LessonSchema, type Lesson } from '@fluently/content-schema';
+import { clearLocalLearningData, readSetting, saveSetting } from '@fluently/storage-web';
+import { downloadAndActivateCurriculum, readActiveCurriculumPackage } from '@fluently/storage-web/curriculum';
 
 type Screen = 'home' | 'path' | 'lesson' | 'review' | 'settings';
 type Locale = 'ar' | 'en';
 const DEMO_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO !== 'false';
 
 function App() {
-  const [signedIn] = useState(DEMO_ENABLED);
+  const [signedIn, setSignedIn] = useState(DEMO_ENABLED);
   const [screen, setScreen] = useState<Screen>('home');
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
   const [progressCount, setProgressCount] = useState(0);
+  const [serverLessons, setServerLessons] = useState<Lesson[]>([]);
   const [locale, setLocale] = useState<Locale>('ar');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [demoNotice, setDemoNotice] = useState(true);
@@ -93,7 +96,61 @@ function App() {
     return locale === 'ar' ? ar : en;
   }, [locale]);
 
-  const lessons = DEMO_ENABLED ? draftLessons : [];
+  useEffect(() => {
+    if (DEMO_ENABLED) return;
+    let cancelled = false;
+    async function restoreAccount() {
+      const loadLocalPackage = async (): Promise<boolean> => {
+        const local = await readActiveCurriculumPackage('fluently.core').catch(() => null);
+        const bytes = local?.files.get('content.json');
+        if (!bytes) return false;
+        try {
+          const data = JSON.parse(new TextDecoder().decode(bytes)) as { lessons?: unknown };
+          if (!Array.isArray(data.lessons)) return false;
+          const validated = data.lessons.map((item) => LessonSchema.safeParse(item));
+          const validLessons = validated.flatMap((result) => result.success ? [result.data] : []);
+          if (cancelled) return false;
+          setServerLessons(validLessons);
+          return validLessons.length > 0;
+        } catch {
+          return false;
+        }
+      };
+
+      const response = await fetch('/api/v1/me', { credentials: 'include' }).catch(() => null);
+      if (response?.ok) {
+        await saveSetting('lastAuthenticatedAt', Date.now());
+        if (cancelled) return;
+        setSignedIn(true);
+        const localReady = await loadLocalPackage();
+        if (!localReady) {
+          const downloaded = await downloadAndActivateCurriculum();
+          if (downloaded.ok) await loadLocalPackage();
+        }
+        return;
+      }
+      if (response?.status === 410) {
+        await clearLocalLearningData();
+        if (!cancelled) setSignedIn(false);
+        return;
+      }
+
+      const lastAuthenticatedAt = await readSetting('lastAuthenticatedAt').catch(() => undefined);
+      const recentlyAuthenticated = typeof lastAuthenticatedAt === 'number' && Date.now() - lastAuthenticatedAt < 180 * 24 * 60 * 60 * 1000;
+      if (!response && recentlyAuthenticated) {
+        const localReady = await loadLocalPackage();
+        if (localReady && !cancelled) {
+          setSignedIn(true);
+          return;
+        }
+      }
+      if (!cancelled) setSignedIn(false);
+    }
+    void restoreAccount().catch(() => { if (!cancelled) setSignedIn(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const lessons = DEMO_ENABLED ? draftLessons : serverLessons;
   const currentStep = activeLesson?.steps[stepIndex];
 
   async function openLesson(lesson: Lesson) {
@@ -200,7 +257,7 @@ function App() {
 
         {screen === 'path' && (
           <section className="page-section"><div className="page-intro"><span className="eyebrow">{t.learning}</span><h1>{t.path}</h1><p>{t.heroText}</p></div>
-            <div className="path-list">{curriculumStages.map((stage, index) => <article className="path-stage" key={stage.id}><div className="path-stage-number">{index + 1}</div><div className="path-stage-copy"><strong>{stage.title}</strong><p>{stage.description}</p>{DEMO_ENABLED && index === 0 && <LessonList lessons={draftLessons.filter((lesson) => lesson.stage === stage.id)} openLesson={openLesson} t={t} />}</div><span className="locked-label">{index === 0 ? t.previewOnly : '—'}</span></article>)}</div>
+            <div className="path-list">{curriculumStages.map((stage, index) => <article className="path-stage" key={stage.id}><div className="path-stage-number">{index + 1}</div><div className="path-stage-copy"><strong>{stage.title}</strong><p>{stage.description}</p>{(DEMO_ENABLED ? draftLessons : serverLessons).filter((lesson) => lesson.stage === stage.id).length > 0 && <LessonList lessons={(DEMO_ENABLED ? draftLessons : serverLessons).filter((lesson) => lesson.stage === stage.id)} openLesson={openLesson} t={t} />}</div><span className="locked-label">{index === 0 ? t.previewOnly : '—'}</span></article>)}</div>
           </section>
         )}
 
