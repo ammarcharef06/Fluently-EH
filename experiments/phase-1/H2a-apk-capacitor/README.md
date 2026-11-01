@@ -98,6 +98,12 @@ H4 ليس جزءًا من حكم نجاح H2a؛ ينفذ بعد H2a وعلى And
 
 ## سجل المحاولات والتنقيحات
 
+- **المحاولة 9 — جزئي وفق معيار KVM:** workflow run `41352126795`، commit `1bb3349b36e33d4f57e8305063639f8c868840c0`، بتاريخ 2026-11-01. نجح job البناء، وفحص APK، ورفع artifact؛ حجم placeholder `134,217,728` بايت، وحجم APK `138,378,150` بايت، وزمن Gradle `86.644` ثانية. نجح إعداد Android SDK، وتنزيل artifact نفسه، وتثبيت `libpulse0`، وفحص اعتماديات QEMU عبر `ldd` بعد إضافة مسارات مكتبات SDK، وإنشاء AVD. أُطلقت عملية Android Emulator `37.2.13.0` مرتين. في كلتا المحاولتين سجل QEMU صراحةً: `This user doesn't have permissions to use KVM (/dev/kvm)` ثم `x86_64 emulation currently requires hardware acceleration`، وخرج قبل `sys.boot_completed`. هذه هي حالة KVM/runner التشغيلية المسموح بها للتصنيف **جزئي** بعد محاولتي تشغيل فعليتين.
+
+  **تدقيق مدة المحاولتين:** لم تستمر كل محاولة 15 دقيقة كاملة؛ خرجت عملية المحاكي فور رفض KVM، ولذلك توقف الانتظار مبكرًا بدل إهدار كامل المهلة بعد انتهاء العملية. رقم 15 دقيقة هو الحد الأعلى لكل محاولة، لا ادعاء بأن كل محاولة استغرقت 15 دقيقة. نص `emulator-result.json` في artifact وصفهما خطأً بأنهما نافذتان كاملتان من 15 دقيقة؛ هذا الوصف الزمني غير صحيح، وسجلات `emulator-attempt-1.log` و`emulator-attempt-2.log` هي المرجع. التصنيف الجزئي يستند إلى فشل KVM الصريح بعد إطلاق المحاكي مرتين، لا إلى ادعاء استنفاد 30 دقيقة.
+
+  تخطيت خطوات `adb install` وlaunch وruntime checksum؛ لذلك لا يوجد زمن تثبيت/إطلاق ولا إثبات لقراءة Android AssetManager في التشغيل. Artifact البناء وartifact المحاكي مرفوعان لمدة 30 يومًا. لم يبدأ أي كود H4.
+
 - **المحاولة 8 — فحص اعتماديات QEMU بإعداد LD_LIBRARY_PATH ناقص:** workflow run `41351794524`، commit `765e7e37159e85348b0f4dcf97ae2f1c7f42e757`، بتاريخ 2026-11-01. نجح بناء APK، وتنزيل artifact، وتثبيت `libpulse0`، كما نجح تنفيذ `$ANDROID_HOME/emulator/emulator -version`. فشل preflight عند فحص QEMU عبر `ldd` لأن الأمر لم يتضمن مسارات المكتبات المرفقة مع Android Emulator، فظهرت مكتبات مثل `libc++` و`libandroid-emu-*.so` كأنها مفقودة. لم يبدأ إنشاء/تشغيل المحاكي ولم تبدأ محاولة إقلاع؛ لذلك ليست حالة جزئية. الإصلاح يضيف مجلدات `emulator/lib64` و`emulator/lib64/qt/lib` وواجهات الرسوم إلى `LD_LIBRARY_PATH` أثناء فحص QEMU. لا تغيير في شروط القبول.
 
 - **المحاولة 7 — فشل تبعية نظام قبل إنشاء AVD:** workflow run `41351455640`، commit `8911d1e1358728b7da47966b8282080c2a44deac`، بتاريخ 2026-11-01. نجح البناء مجددًا ونُقل الـAPK نفسه كـartifact. نجح التحقق من وجود binary في SDK، لكن تشغيله بـ`-version` كشف أن `qemu-system-x86_64` لا يبدأ بسبب مكتبة ديناميكية مفقودة `libpulse.so.0`. توقفت الخطوة برمز 127 قبل إنشاء AVD وقبل إطلاق أي محاولة إقلاع؛ إذن هذه **مشكلة تبعية نظام** وليست نتيجة جزئية أو اختبار KVM. الإصلاح يثبت `libpulse0` على Ubuntu 24.04 ثم يفحص اعتماديات binary وQEMU بـ`ldd` ويمنع بدء المحاولات إن بقيت مكتبات مفقودة. لا تغيير في شروط القبول.
@@ -118,28 +124,30 @@ H4 ليس جزءًا من حكم نجاح H2a؛ ينفذ بعد H2a وعلى And
 
 - **التمييز في الحكم:** فشل المحاولة الأولى هو فشل إعداد workflow، وليس نتيجة اختبار قراءة الأصول داخل APK؛ لم يصل الاختبار إلى تلك الخطوة. يلزم تشغيل نظيف لاحق يحقق كامل المعايير قبل إعلان H2a ناجحًا.
 
-## جدول النتائج
+## النتيجة النهائية لـ H2a — جزئي
 
-| القياس | النتيجة |
+| القياس | الدليل / النتيجة |
 |---|---|
-| Runner image / version | ubuntu-24.04؛ ImageOS/ImageVersion يسجلان في `evidence/build.json` عند التشغيل |
-| Node / npm | Node 22.16.0؛ npm الفعلي يسجل في `evidence/build.json` |
-| JDK | JDK 21؛ الإصدار الكامل يسجل في `evidence/build.json`؛ يتطلبه Capacitor 8.6.0 Android source/target compatibility |
-| Android SDK / Build Tools | Platform 36 / Build Tools 36.0.0؛ يسجل التثبيت الفعلي |
-| Gradle Wrapper / AGP | 8.14.3 / 8.13.0 من قالب Capacitor 8.6.0؛ تؤكد القيم من الملفات وسجل Gradle |
-| Capacitor | 8.6.0 (`core`/`android`/`cli`) مثبت في `h2a/package.json` |
-| حجم placeholder | 134,217,728 bytes |
-| SHA-256 للـplaceholder | لم يحسب بعد |
-| زمن Gradle build | لم يقس بعد |
-| حجم APK النهائي | لم يقس بعد |
-| زمن adb install | لم يقس بعد |
-| زمن الإطلاق وظهور checksum | لم يقس بعد |
-| تاريخ القطع | 2026-11-05 23:59 Africa/Algiers |
+| التصنيف | **جزئي** — نجح بناء APK والتحقق من وجود placeholder بحجمه الصحيح؛ تعذر تشغيل المحاكي بسبب رفض KVM على runner. لا توجد نتيجة runtime checksum. |
+| Workflow run | [41352126795](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41352126795) |
+| Commit SHA المختبَر | `1bb3349b36e33d4f57e8305063639f8c868840c0` |
+| Runner label / image | `ubuntu-24.04` / `ImageOS=ubuntu24` / `ImageVersion=20261026.354.1` |
+| Node / npm | `v22.16.0` / `10.9.2` |
+| JDK | Temurin OpenJDK `21.0.13+9` (LTS) |
+| Android SDK / Build Tools | Platform `android-36` / Build Tools `36.0.0` |
+| Gradle Wrapper / Gradle | `gradle-8.14.3-all.zip` / `8.14.3` |
+| Android Gradle Plugin | `8.13.0` |
+| Capacitor | `8.6.0` (`core`/`android`/`cli`) |
+| Android Emulator | `37.2.13.0` |
+| Placeholder | `134,217,728` bytes (128 MiB)، موجود كمدخل واحد `assets/placeholder.bin` داخل APK وبالحجم المسجل |
+| SHA-256 المتوقع قبل التغليف | `d6c0c141b705c9c9f4f40f00100534616072babd0adc75cc8fc18bc7b4fcc70c` |
+| حجم APK | `138,378,150` bytes = `131.968 MiB` |
+| زمن Gradle build | `86.644` seconds |
+| زمن adb install | غير مقاس — تخطيت الخطوة لأن المحاكي لم يقلع |
+| زمن الإطلاق إلى checksum | غير مقاس — التطبيق لم يُطلق |
+| Runtime checksum / Logcat | غير مثبت — لم يعمل التطبيق ولم تصدر وسوم `CHECKSUM` أو `RESULT:MATCH` |
+| KVM | المحاولتان رفضتا صلاحية مستخدم runner على `/dev/kvm`؛ انظر سجل المحاولات وملفات log |
 | Artifact retention | 30 يومًا لكل artifact |
-| ملف expected.sha256 | يُنشأ قبل التغليف في job build ويرتبط بنفس run ID |
-| Runtime checksum | لم يقس بعد |
-| نوع التوقيع | Debug signing فقط |
-| وسوم Logcat | CHECKSUM:<actual> وRESULT:MATCH/MISMATCH — لم تختبر بعد |
-| مصدر القيمة المتوقعة | SHA-256 من job build قبل التغليف — لم ينفذ بعد |
-| حد رفض H4 | تعديل بايت واحد مع إبقاء hash الأصلي؛ يجب رفض التفعيل |
-| النتيجة | قيد التنفيذ — لم تصدر نتيجة بعد |
+| توقيع APK | Debug signing فقط |
+| النتيجة | **جزئي** — يتوقف الإثبات عند نجاح البناء واحتواء placeholder؛ لا ادعاء بإثبات القراءة عبر AssetManager أو runtime hash |
+
