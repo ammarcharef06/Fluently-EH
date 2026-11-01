@@ -1,0 +1,13 @@
+{
+  "name": "@fluently/storage-native",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@capacitor-community/sqlite": "8.1.1",
+    "@capacitor/filesystem": "8.1.5",
+    "@fluently/domain": "1.0.0",
+    "@fluently/content-schema": "1.0.0"
+  }
+}
