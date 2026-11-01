@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - implementation/full-build
+    paths-ignore:
+      - package-lock.json
   pull_request:
     branches:
       - main
       - implementation/full-build
-  paths-ignore:
-    - package-lock.json
+    paths-ignore:
+      - package-lock.json
 
 permissions:
   contents: write
