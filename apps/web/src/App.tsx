@@ -5,13 +5,15 @@ import {
   Settings2, ShieldCheck, Sparkles, Sun, Target, Volume2, X
 } from 'lucide-react';
 import { draftLessons, curriculumStages } from '@fluently/curriculum';
-import { gradeChoice, type ChoiceQuestion } from '@fluently/domain';
+import { createSyncOperation, gradeChoice, scheduleReview, selectDueReviews, type ChoiceQuestion, type ReviewState } from '@fluently/domain';
 import {
-  listLessonProgress, readLessonProgress, requestPersistentStorage, saveLessonProgress
+  enqueueOperation, listLessonProgress, listReviewStates, readLessonProgress, requestPersistentStorage,
+  saveLessonProgress, saveReviewState
 } from '@fluently/storage-web';
 import { LessonSchema, type Lesson } from '@fluently/content-schema';
 import { clearLocalLearningData, readSetting, saveSetting } from '@fluently/storage-web';
 import { downloadAndActivateCurriculum, readActiveCurriculumPackage } from '@fluently/storage-web/curriculum';
+import { syncPendingOperations } from '@fluently/storage-web/sync';
 
 type Screen = 'home' | 'path' | 'lesson' | 'review' | 'settings';
 type Locale = 'ar' | 'en';
@@ -25,6 +27,8 @@ function App() {
   const [completed, setCompleted] = useState<string[]>([]);
   const [progressCount, setProgressCount] = useState(0);
   const [serverLessons, setServerLessons] = useState<Lesson[]>([]);
+  const [dueReviews, setDueReviews] = useState<ReviewState[]>([]);
+  const [syncStatus, setSyncStatus] = useState('idle');
   const [locale, setLocale] = useState<Locale>('ar');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [demoNotice, setDemoNotice] = useState(true);
