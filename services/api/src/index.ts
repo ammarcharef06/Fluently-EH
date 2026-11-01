@@ -286,7 +286,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     if (body.error) return json({ error: body.error }, body.error === 'request_body_too_large' ? 413 : 400);
     const parsed = SyncInput.safeParse(body.data);
     if (!parsed.success) return json({ error: 'invalid_sync_payload', details: parsed.error.issues }, 400);
-    const containsDeletion = parsed.data.operations.some((operation) => operation.entityType === 'account_delete');
+    const operations: SyncOperation[] = parsed.data.operations;
+    const containsDeletion = operations.some((operation) => operation.entityType === 'account_delete');
     if (containsDeletion && parsed.data.operations.length !== 1) {
       return json({ error: 'account_deletion_must_be_a_standalone_operation' }, 400);
     }
@@ -298,7 +299,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     try {
       await sql.begin(async (tx) => {
         await tx.unsafe("select set_config('app.user_id', $1, true)", [user.userId]);
-        for (const operation of parsed.data.operations) {
+        for (const operation of operations) {
           const inserted = await tx.unsafe(
             'insert into sync_operations (user_id,operation_id,entity_id,entity_type,schema_version,occurred_at_local,payload) ' +
             'values ($1,$2,$3,$4,$5,$6,$7::jsonb) on conflict (user_id,operation_id) do nothing returning operation_id',
