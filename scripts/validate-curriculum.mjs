@@ -15,4 +15,4 @@ for (const file of files) {
   if (!entry.source?.note || !entry.source?.license) errors.push(file + ': source and rights fields are required.');
 }
 if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
-console.log('Validated ' + files.length + ' draft lesson(s). None are eligible for publication without human approval.');
+console.warn('Validated ' + files.length + ' draft lesson(s). None are eligible for publication without human approval.');
