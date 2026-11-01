@@ -10,7 +10,7 @@
 | PLAT-002 | تكون لوحة الإدارة تطبيق ويب مستقلًا بمدخل بناء منفصل، لا جزءًا من PWA المتعلم | ARCHITECTURE §3.2–4، PARITY | DECISIONS 63، 72 | P2 هيكل؛ P7 وظائف | P2-ADMIN-001: مسار بناء منفصل واختبار صلاحية خادمية لاحقًا | مخطط |
 | PKG-001A | تتضمن حزمة Android APK **حزمة المنهج المضمّنة** كاملة وقت البناء | PRD §13.4، PLATFORM-REQUIREMENTS §3، OFFLINE-AND-SYNC §5 | DECISIONS 77، 107، 121 | P1 H2a/H4؛ P4؛ P10 | H2a: بناء APK وقراءة placeholder/checksum من داخله؛ H4: حزمة اختبار داخل APK ورفض تغيير بايت واحد | مخطط — بانتظار مراجعة معايير الشاهد |
 | PKG-001B | تتضمن توزيعات Windows EXE **حزمة المنهج المضمّنة** كاملة وقت البناء | PRD §13.4، PLATFORM-REQUIREMENTS §4، OFFLINE-AND-SYNC §5 | DECISIONS 77، 107، 121؛ DECISIONS §E-9 | قبل إطلاق Windows؛ خارج P1 الحالي | H2b يعاد فتحه فقط بعد: (1) Windows runner + Rust/Tauri/Node/WebView2 موثقة، (2) إثبات build/install/runtime-read + tamper rejection، (3) شهادة Authenticode موثوقة وتكلفة/تجديد مقبولان ومفتاح محفوظ خارج Git | مؤجل بقرار — غير مُثبت — خارج نطاق المرحلة 1 بسبب غياب Rust/Tauri والتوقيع |
-| H2A-APK | يثبت APK على runner موثق ويقرأ placeholder من APK المثبت ويطبع checksum يطابق قيمة محسوبة قبل التغليف | experiments/phase-1/H2a-apk-capacitor/README.md | DECISIONS §E-10 | P1؛ تاريخ القطع 2026-11-05 23:59 Africa/Algiers | نجاح/فشل/جزئي محدد مسبقًا؛ CI build مستقل عن install-on-emulator؛ checksum المتوقع من build output + expected.sha256 artifact لنفس run ID؛ CHECKSUM/RESULT آليان؛ احتفاظ artifacts لمدة 30 يومًا | معايير مكتوبة — بانتظار المراجعة الصريحة |
+| H2A-APK | يثبت APK على runner موثق ويقرأ placeholder من APK المثبت ويطبع checksum يطابق قيمة محسوبة قبل التغليف | experiments/phase-1/H2a-apk-capacitor/README.md | DECISIONS §E-10 | P1؛ تاريخ القطع 2026-11-05 23:59 Africa/Algiers | نجاح/فشل/جزئي محدد مسبقًا؛ CI build مستقل عن install-on-emulator؛ checksum المتوقع من build output + expected.sha256 artifact لنفس run ID؛ CHECKSUM/RESULT آليان؛ احتفاظ artifacts لمدة 30 يومًا | قيد التنفيذ — اعتماد H2a صدر؛ لا كود H4 |
 | H4-ANDROID | يعمل التحقق على حزمة اختبار مضمّنة كما ستُشحن داخل APK؛ تُقبل السليمة وتُرفض نسخة معدل منها بايت واحد | experiments/phase-1/H2a-apk-capacitor/README.md، PLATFORM-REQUIREMENTS §3، OFFLINE-AND-SYNC §5 | DECISIONS 88، 150؛ DECISIONS §E-10 | P1 بعد H2a؛ Android فقط | حالتان: payload سليم + manifest سليم ينتجان MATCH/ACTIVATION:ACCEPTED؛ payload معدل بايتًا واحدًا قبل التغليف + manifest الأصلي ينتج MISMATCH/ACTIVATION:REJECTED. يعاد بناء APK وتوقيعه debug بعد تجهيز كل حالة | مخطط — Android فقط؛ بعد H2a |
 | PKG-002 | ينزّل Web/PWA **حزمة المنهج المنزّلة عند أول استخدام** بعد تسجيل الدخول؛ لا يضمّنها في ملفات الويب الثابتة | PRD §13.4، PLATFORM-REQUIREMENTS §2، OFFLINE-AND-SYNC §5 | DECISIONS 99 | P1 probe؛ P4 engine؛ P5 learner | P1-PKG-002: اختبار تنزيل ZIP والتحقق؛ P4/P5: اختبار متصفح فعلي | مخطط |
 | PKG-003 | لا تُفعّل الحزمة قبل التحقق من manifest والمخطط والحجم والبصمات | OFFLINE-AND-SYNC §5، ARCHITECTURE §6 | DECISIONS 88، 150 | P1 ثم P4 | P1-PKG-003: H4 يختبر تعديل بايت واحد؛ P4: schema/hash/تفعيل آمن | مخطط |
@@ -34,7 +34,7 @@
 
 ## سجل نتائج المرحلة 1
 
-> H2a لم يُشغّل بعد؛ ينتظر مراجعة ملف الشاهد. H2b مؤجل بقرار ولا يوصف بالفشل. H4 قابل للاختبار على Android فقط بعد H2a؛ لا يُعمم على Windows.
+> بدأ تنفيذ H2a بعد الاعتماد الصريح؛ كود H4 لم يبدأ. H2b مؤجل بقرار ولا يوصف بالفشل. H4 قابل للاختبار على Android فقط بعد H2a؛ لا يُعمم على Windows.
 
 
 | Test ID | البيئة / الإصدار | النتيجة | الدليل | التاريخ | ملاحظات |

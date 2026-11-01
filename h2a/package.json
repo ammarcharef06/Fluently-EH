@@ -1,0 +1,13 @@
+{
+  "name": "fluently-h2a-apk-probe",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Isolated H2a Capacitor APK packaging and runtime-read experiment.",
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}

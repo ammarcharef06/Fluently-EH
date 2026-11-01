@@ -1,0 +1,289 @@
+name: H2a Android APK proof
+
+on:
+  push:
+    branches:
+      - phase-1/initial-feasibility
+    paths:
+      - ".github/workflows/h2a-apk.yml"
+      - "h2a/**"
+      - "experiments/phase-1/H2a-apk-capacitor/README.md"
+      - "TRACEABILITY-MATRIX.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: h2a-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-apk:
+    name: Build APK and verify packaged payload
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22.16.0"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        with:
+          distribution: temurin
+          java-version: "17"
+          check-latest: false
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
+        with:
+          cmdline-tools-version: "15859902"
+          packages: |
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+
+      - name: Generate payload, create Capacitor Android project, and build
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd h2a
+          mkdir -p evidence
+
+          python3 scripts/make_placeholder.py "$RUNNER_TEMP/placeholder.bin"
+          PLACEHOLDER_BYTES="$(stat -c '%s' "$RUNNER_TEMP/placeholder.bin")"
+          test "$PLACEHOLDER_BYTES" = "134217728"
+          EXPECTED_SHA="$(sha256sum "$RUNNER_TEMP/placeholder.bin" | awk '{print $1}')"
+          printf '%s\n' "$EXPECTED_SHA" > evidence/expected.sha256
+
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          cp package-lock.json evidence/npm-package-lock.json
+          npm ls --all --json > evidence/npm-dependency-tree.json
+
+          npx cap add android
+          npx cap sync android
+          mkdir -p android/app/src/main/assets
+          cp "$RUNNER_TEMP/placeholder.bin" android/app/src/main/assets/placeholder.bin
+          python3 scripts/patch_android.py "$EXPECTED_SHA"
+
+          node --version > evidence/node-version.txt
+          npm --version > evidence/npm-version.txt
+          java -version 2> evidence/java-version.txt
+          printf 'ImageOS=%s\nImageVersion=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}" > evidence/runner-image.txt
+          ./gradlew --version > evidence/gradle-version.txt
+          grep -Eo 'com.android.tools.build:gradle:[0-9.]+' android/build.gradle | head -n 1 > evidence/agp-version.txt
+          grep -Eo 'gradle-[0-9.]+-(all|bin)\.zip' android/gradle/wrapper/gradle-wrapper.properties > evidence/gradle-wrapper-version.txt
+          sdkmanager --list_installed > evidence/android-sdk-packages.txt
+
+          START_NS="$(python3 -c 'import time; print(time.monotonic_ns())')"
+          set +e
+          ./gradlew --no-daemon --stacktrace clean assembleDebug -PplaceholderSha256="$EXPECTED_SHA" > gradle-build.log 2>&1
+          GRADLE_RC=$?
+          set -e
+          END_NS="$(python3 -c 'import time; print(time.monotonic_ns())')"
+          python3 - "$START_NS" "$END_NS" "$GRADLE_RC" > evidence/gradle-build-time.json <<'PY'
+          import json, sys
+          start, end, rc = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
+          print(json.dumps({"seconds": round((end-start)/1_000_000_000, 3), "returncode": rc}, indent=2))
+          PY
+          cat gradle-build.log
+          test "$GRADLE_RC" -eq 0
+
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          python3 - "$APK" "$PLACEHOLDER_BYTES" "$EXPECTED_SHA" <<'PY'
+          import json, os, sys, zipfile
+          apk, expected_size, expected_sha = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+          apk_size = os.path.getsize(apk)
+          with zipfile.ZipFile(apk) as archive:
+              entries = [x for x in archive.infolist() if x.filename == "assets/placeholder.bin"]
+              if len(entries) != 1:
+                  raise SystemExit(f"expected one assets/placeholder.bin entry, found {len(entries)}")
+              if entries[0].file_size != expected_size:
+                  raise SystemExit(f"APK payload size {entries[0].file_size}; expected {expected_size}")
+          import json
+          def read(name):
+              return open("evidence/" + name, encoding="utf-8").read().strip()
+          gradle_out = read("gradle-version.txt")
+          gradle_version = next((line.split(" ",1)[1].strip() for line in gradle_out.splitlines() if line.startswith("Gradle ")), "unknown")
+          evidence = {
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow_run_url": f'https://github.com/{os.environ["GITHUB_REPOSITORY"]}/actions/runs/{os.environ["GITHUB_RUN_ID"]}',
+              "runner_label": "ubuntu-24.04",
+              "image_os": os.environ.get("ImageOS", "unknown"),
+              "image_version": os.environ.get("ImageVersion", "unknown"),
+              "node": read("node-version.txt"),
+              "npm": read("npm-version.txt"),
+              "jdk": read("java-version.txt"),
+              "android_sdk_platform": "android-36",
+              "android_build_tools": "36.0.0",
+              "gradle": gradle_version,
+              "gradle_wrapper": read("gradle-wrapper-version.txt"),
+              "agp": read("agp-version.txt").split(":")[-1],
+              "capacitor_core": "8.6.0",
+              "capacitor_android": "8.6.0",
+              "capacitor_cli": "8.6.0",
+              "placeholder_bytes": expected_size,
+              "expected_sha256": expected_sha,
+              "apk_bytes": apk_size,
+              "apk_mib": round(apk_size / 1048576, 3),
+              "gradle_build_seconds": json.load(open("evidence/gradle-build-time.json"))["seconds"]
+          }
+          with open("evidence/build.json", "w", encoding="utf-8") as f:
+              json.dump(evidence, f, indent=2)
+              f.write("\n")
+          print(json.dumps(evidence, indent=2))
+          PY
+          echo "expected_sha256=$EXPECTED_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact and evidence
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: h2a-build-${{ github.run_id }}-${{ github.sha }}
+          path: |
+            h2a/android/app/build/outputs/apk/debug/app-debug.apk
+            h2a/evidence/**
+            h2a/gradle-build.log
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
+
+  install-on-emulator:
+    name: Install the same APK and verify runtime checksum
+    needs: build-apk
+    if: needs.build-apk.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Set up Android SDK and API 36 emulator
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
+        with:
+          cmdline-tools-version: "15859902"
+          packages: |
+            platform-tools
+            emulator
+            platforms;android-36
+            build-tools;36.0.0
+            system-images;android-36;google_apis;x86_64
+
+      - name: Download artifact from this workflow run
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: h2a-build-${{ github.run_id }}-${{ github.sha }}
+          path: h2a-artifact
+
+      - name: Create and boot emulator (two attempts maximum)
+        id: emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p h2a-evidence
+          echo "no" | avdmanager create avd --name h2a_api36 --package "system-images;android-36;google_apis;x86_64" --device "pixel_2" --force
+          BOOTED=0
+          for ATTEMPT in 1 2; do
+            echo "Starting emulator attempt ${ATTEMPT}/2"
+            emulator -avd h2a_api36 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -accel auto -no-snapshot -wipe-data > "h2a-evidence/emulator-attempt-${ATTEMPT}.log" 2>&1 &
+            EMULATOR_PID=$!
+            adb start-server
+            DEADLINE=$((SECONDS + 900))
+            while (( SECONDS < DEADLINE )); do
+              if adb devices | grep -q 'emulator-.*device$'; then
+                BOOT_STATE="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+                if [ "$BOOT_STATE" = "1" ]; then
+                  BOOTED=1
+                  break
+                fi
+              fi
+              if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+                break
+              fi
+              sleep 5
+            done
+            if [ "$BOOTED" -eq 1 ]; then
+              echo "booted=true" >> "$GITHUB_OUTPUT"
+              echo "attempts_used=$ATTEMPT" >> "$GITHUB_OUTPUT"
+              break
+            fi
+            echo "Attempt $ATTEMPT did not complete boot."
+            kill "$EMULATOR_PID" 2>/dev/null || true
+            wait "$EMULATOR_PID" 2>/dev/null || true
+            adb emu kill >/dev/null 2>&1 || true
+            adb kill-server >/dev/null 2>&1 || true
+            pkill -x qemu-system-x86_64 >/dev/null 2>&1 || true
+            sleep 5
+          done
+
+          if [ "$BOOTED" -ne 1 ]; then
+            python3 - <<'PY'
+          import json
+          with open("h2a-evidence/emulator-result.json", "w", encoding="utf-8") as f:
+              json.dump({"classification":"partial","reason":"Emulator did not boot after two documented 15-minute attempts; build artifact exists."}, f, indent=2)
+              f.write("\n")
+          PY
+            echo "booted=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          adb shell input keyevent 82 || true
+          adb shell getprop ro.build.version.sdk > h2a-evidence/emulator-api-level.txt
+          emulator -version > h2a-evidence/emulator-version.txt 2>&1
+
+      - name: Install APK and measure adb install time
+        if: steps.emulator.outputs.booted == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 h2a/scripts/install_measure.py h2a-artifact/app-debug.apk h2a-evidence/adb-install.json
+
+      - name: Launch app and capture checksum timing
+        if: steps.emulator.outputs.booted == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 h2a/scripts/capture_launch.py h2a-evidence/logcat.raw h2a-evidence/launch-to-checksum-seconds.txt
+
+      - name: Validate runtime checksum against independent build output
+        if: steps.emulator.outputs.booted == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 h2a/scripts/validate_logcat.py h2a-evidence/logcat.raw h2a-artifact/evidence/expected.sha256
+          python3 - <<'PY'
+          import json, os, re
+          record = {
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "emulator_api": open("h2a-evidence/emulator-api-level.txt").read().strip(),
+              "emulator_version": open("h2a-evidence/emulator-version.txt").read().strip(),
+              "adb_install_seconds": json.load(open("h2a-evidence/adb-install.json"))["seconds"],
+              "launch_to_checksum_seconds": float(open("h2a-evidence/launch-to-checksum-seconds.txt").read().strip()),
+              "runtime_checksum": re.search(r"CHECKSUM:([0-9a-fA-F]{64})", open("h2a-evidence/logcat.raw").read()).group(1),
+              "result": "MATCH"
+          }
+          with open("h2a-evidence/emulator-result.json", "w", encoding="utf-8") as f:
+              json.dump(record, f, indent=2)
+              f.write("\n")
+          print(json.dumps(record, indent=2))
+          PY
+
+      - name: Upload emulator logs and measurements
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: h2a-emulator-${{ github.run_id }}-${{ github.sha }}
+          path: h2a-evidence/**
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
