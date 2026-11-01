@@ -8,9 +8,12 @@
 |---|---|---|---|---|---|---|
 | PLAT-001 | يبنى تطبيق المتعلم للويب وAndroid وWindows من واجهة React/TypeScript مشتركة | PRD §4، ARCHITECTURE §2 | DECISIONS 73 | P1 ثم P2 | P1-PLAT-001: بناء وتشغيل probe لكل هدف | مخطط |
 | PLAT-002 | تكون لوحة الإدارة تطبيق ويب مستقلًا بمدخل بناء منفصل، لا جزءًا من PWA المتعلم | ARCHITECTURE §3.2–4، PARITY | DECISIONS 63، 72 | P2 هيكل؛ P7 وظائف | P2-ADMIN-001: مسار بناء منفصل واختبار صلاحية خادمية لاحقًا | مخطط |
-| PKG-001 | تتضمن توزيعات Android وWindows **حزمة المنهج المضمّنة** كاملة وقت بناء الإصدار | PRD §13.4، PLATFORM-REQUIREMENTS §3–4، OFFLINE-AND-SYNC §5 | DECISIONS 77، 107، 121 | P1 probe؛ P4 engine؛ P10 release | P1-PKG-001: manifest + inventory + hashes؛ P4/P10: فحص APK/EXE النهائي | قيد الاختبار |
+| PKG-001A | تتضمن حزمة Android APK **حزمة المنهج المضمّنة** كاملة وقت البناء | PRD §13.4، PLATFORM-REQUIREMENTS §3، OFFLINE-AND-SYNC §5 | DECISIONS 77، 107، 121 | P1 H2a/H4؛ P4؛ P10 | H2a: بناء APK وقراءة placeholder/checksum من داخله؛ H4: حزمة اختبار داخل APK ورفض تغيير بايت واحد | مخطط — بانتظار مراجعة معايير الشاهد |
+| PKG-001B | تتضمن توزيعات Windows EXE **حزمة المنهج المضمّنة** كاملة وقت البناء | PRD §13.4، PLATFORM-REQUIREMENTS §4، OFFLINE-AND-SYNC §5 | DECISIONS 77، 107، 121؛ DECISIONS §E-9 | قبل إطلاق Windows؛ خارج P1 الحالي | H2b: بناء/تثبيت/قراءة runtime/تحقق/توقيع Authenticode على Windows runner | مؤجل بقرار — غير مُثبت، وليس فشلًا |
+| H2A-APK | يثبت APK على runner موثق ويقرأ placeholder من APK المثبت ويطبع checksum يطابق قيمة محسوبة قبل التغليف | experiments/phase-1/H2a-apk-capacitor/README.md | DECISIONS §E-10 | P1؛ الموعد 2026-11-08 23:59 Africa/Algiers | CI job build منفصل عن install-on-emulator؛ تسجيل الحجم وزمن البناء والتثبيت والإصدارات والـLogcat | مخطط — لا تشغيل قبل مراجعة المعايير |
+| H4-ANDROID | يعمل التحقق على حزمة اختبار مضمّنة كما ستُشحن داخل APK؛ تُقبل السليمة وتُرفض نسخة معدل منها بايت واحد | experiments/phase-1/H2a-apk-capacitor/README.md، PLATFORM-REQUIREMENTS §3، OFFLINE-AND-SYNC §5 | DECISIONS 88، 150؛ DECISIONS §E-10 | P1 بعد H2a؛ Android فقط | نفس APK packaging/runtime path: manifest أصلي، تعديل بايت واحد، ظهور RESULT:MISMATCH ورفض التفعيل؛ نجاح ورفض آليان | مخطط — Android فقط |
 | PKG-002 | ينزّل Web/PWA **حزمة المنهج المنزّلة عند أول استخدام** بعد تسجيل الدخول؛ لا يضمّنها في ملفات الويب الثابتة | PRD §13.4، PLATFORM-REQUIREMENTS §2، OFFLINE-AND-SYNC §5 | DECISIONS 99 | P1 probe؛ P4 engine؛ P5 learner | P1-PKG-002: اختبار تنزيل ZIP والتحقق؛ P4/P5: اختبار متصفح فعلي | مخطط |
-| PKG-003 | لا تُفعّل الحزمة قبل التحقق من manifest والمخطط والحجم والبصمات | OFFLINE-AND-SYNC §5، ARCHITECTURE §6 | DECISIONS 88، 150 | P1 ثم P4 | P1-PKG-003: رفض hash/schema غير صالحين؛ P4: تفعيل آمن | قيد الاختبار |
+| PKG-003 | لا تُفعّل الحزمة قبل التحقق من manifest والمخطط والحجم والبصمات | OFFLINE-AND-SYNC §5، ARCHITECTURE §6 | DECISIONS 88، 150 | P1 ثم P4 | P1-PKG-003: H4 يختبر تعديل بايت واحد؛ P4: schema/hash/تفعيل آمن | مخطط |
 | PKG-004 | تُرفض مسارات ZIP الخطرة والملفات المكررة وغير المعلنة والملفات التنفيذية غير المسموح بها | RELEASE-AND-TESTING §7، OFFLINE-AND-SYNC §5 | DECISIONS 150 | P1 ثم P4 | P1-PKG-004: traversal/duplicate/undeclared fixtures | مخطط |
 | PKG-005 | يبقى إصدار المنهج النشط متاحًا إذا فشل التحقق أو التفعيل لإصدار جديد | OFFLINE-AND-SYNC §5–6 | DECISIONS 122 | P1 ثم P4 | P1-PKG-005: فشل الحزمة الجديدة لا يغيّر active pointer | قيد الاختبار |
 | OFF-001 | تستمر الدروس والاختبارات والمراجعة والصوت المنزّل دون اتصال بعد توفر الحزمة محليًا | PRD §13، OFFLINE-AND-SYNC §1–3 | DECISIONS 75، 116 | P1 ثم P4/P5 | P1-OFF-001: تحقق الحزمة محليًا؛ P5: رحلة درس كاملة Offline | مخطط |
@@ -27,14 +30,17 @@
 | SEC-001 | لا توجد أسرار أو مفاتيح توقيع أو بيانات شخصية داخل المستودع أو حزم المحتوى العامة | AGENTS §1 و§3، SECURITY-AND-PRIVACY | DECISIONS 85–91 | كل بوابة | SEC-001: secret scan + review | مخطط |
 | UPD-001 | يتحدث المحتوى مستقلًا عن التطبيق عندما يكون schema متوافقًا، مع رفض النسخة غير المتوافقة | ARCHITECTURE §9، OFFLINE-AND-SYNC §6 | DECISIONS 100، 122، 123 | P1 ثم P4/P10 | P1-UPD-001: min/max schema compatibility probe | مخطط |
 | AND-001 | يوقع APK بمفتاح إصدار ثابت، ويؤكد المستخدم التثبيت عبر النظام | PLATFORM-REQUIREMENTS §3، RELEASE-AND-TESTING §8 | DECISIONS 113 | P1 prototype؛ P10 release | P1-AND-001: بناء/توقيع تجريبي بلا أسرار؛ P10: ترقية على جهاز فعلي | مخطط |
-| WIN-001 | تحفظ بيانات Windows في مساحة المستخدم، وتتحقق سلامة التحديث دون فتح منفذ وارد | PLATFORM-REQUIREMENTS §4 | DECISIONS 73، 95 | P1 prototype؛ P10 release | P1-WIN-001: smoke test؛ P10: update/failure rollback | مخطط |
+| WIN-001 | تحفظ بيانات Windows في مساحة المستخدم، وتتحقق سلامة التحديث دون فتح منفذ وارد | PLATFORM-REQUIREMENTS §4 | DECISIONS 73، 95؛ DECISIONS §E-9 | خارج P1 الحالي؛ قبل إصدار Windows | H2b مؤجل؛ يلزم runner Windows وRust/Tauri وقرار Authenticode مستقل | مؤجل بقرار — غير مُثبت |
 
 ## سجل نتائج المرحلة 1
 
+> H2a لم يُشغّل بعد؛ ينتظر مراجعة ملف الشاهد. H2b مؤجل بقرار ولا يوصف بالفشل. H4 قابل للاختبار على Android فقط بعد H2a؛ لا يُعمم على Windows.
+
+
 | Test ID | البيئة / الإصدار | النتيجة | الدليل | التاريخ | ملاحظات |
 |---|---|---|---|---|---|
-| P1-PKG-003 | لم ينفذ بعد | مخطط | — | — | تحقق schema/hash والتفعيل الآمن |
-| P1-PKG-004 | لم ينفذ بعد | مخطط | — | — | ZIP path traversal والملفات المكررة |
-| P1-PKG-005 | لم ينفذ بعد | مخطط | — | — | بقاء active pointer عند فشل التحقق |
+| H2a-APK | لم ينفذ بعد | مخطط — بانتظار مراجعة المعايير | — | 2026-11-08 | APK، placeholder 128 MiB، checksum مستقل وLogcat آلي |
+| H2b-EXE | لم ينفذ؛ مؤجل بقرار | مؤجل — غير مُثبت | — | قبل إطلاق Windows | Rust/Tauri وAuthenticode غير متاحين في P1 |
+| H4-ANDROID | لم ينفذ بعد H2a | مخطط — Android فقط | — | 2026-11-08 | حزمة مضمّنة؛ تعديل بايت واحد؛ يجب أن يظهر RESULT:MISMATCH ويُرفض التفعيل |
 
 **قاعدة التحديث:** بعد كل تجربة، حدّث صف المتطلب وسجل نتيجة الاختبار في هذا الملف ضمن PR نفسه الذي يغير القرار أو التنفيذ ذي الصلة. لا تضع "اجتاز" دون سجل دليل قابل لإعادة الفحص.
