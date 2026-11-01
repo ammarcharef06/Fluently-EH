@@ -53,6 +53,14 @@
 - [رخصة الشيفرة](LICENSE)
 - [رخصة المحتوى التعليمي](LICENSE-CONTENT.md)
 
+## وثائق المنتج والتعليم
+
+- [معمارية المنهج](docs/CURRICULUM-ARCHITECTURE.md)
+- [نظام التقييم والإتقان](docs/ASSESSMENT-SYSTEM.md)
+- [معايير المحتوى التعليمي](docs/CONTENT-STANDARDS.md)
+- [مواصفات محرر المحتوى](docs/CONTENT-EDITOR.md)
+- [تجربة المستخدم وإمكانية الوصول](docs/UX-AND-ACCESSIBILITY.md)
+
 ## المساهمة
 
 المساهمات المجتمعية مرحب بها عبر Issues وPull Requests. لا يُدمج أي تغيير قبل المراجعة والاختبارات المطلوبة وموافقة المسؤولين المخولين. راجع [CONTRIBUTING.md](CONTRIBUTING.md).
