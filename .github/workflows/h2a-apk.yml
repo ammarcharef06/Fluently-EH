@@ -181,14 +181,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends libpulse0
           mkdir -p h2a-evidence
-          for BINARY in "$ANDROID_HOME/emulator/emulator" "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"; do
-            test -x "$BINARY"
-            ldd "$BINARY" | tee -a h2a-evidence/emulator-native-dependencies.txt
-            if ldd "$BINARY" | grep -q "not found"; then
-              echo "::error::Unresolved shared library dependency for $BINARY"
-              exit 1
-            fi
-          done
+          QEMU_BIN="$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"
+          test -x "$QEMU_BIN"
+          EMULATOR_LIB_PATH="$ANDROID_HOME/emulator/lib64:$ANDROID_HOME/emulator/lib64/qt/lib:$ANDROID_HOME/emulator/lib64/gles_swiftshader:$ANDROID_HOME/emulator/lib64/vulkan"
+          LD_LIBRARY_PATH="$EMULATOR_LIB_PATH" ldd "$QEMU_BIN" | tee h2a-evidence/emulator-native-dependencies.txt
+          if LD_LIBRARY_PATH="$EMULATOR_LIB_PATH" ldd "$QEMU_BIN" | grep -q "not found"; then
+            echo "::error::Unresolved shared library dependency for QEMU after adding its SDK library paths"
+            exit 1
+          fi
 
       - name: Create and boot emulator (two attempts maximum)
         id: emulator
