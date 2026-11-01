@@ -1,10 +1,14 @@
 export type AdminRole = 'owner' | 'editor' | 'reviewer' | 'publisher';
-export type SessionClaims = { sub: string; roles?: AdminRole[]; email_verified?: boolean };
 
 export interface ObjectBucket {
   get(key: string): Promise<{ body: ReadableStream; httpEtag: string } | null>;
-  put(key: string, value: string | ArrayBuffer | ArrayBufferView | ReadableStream, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
+  put(
+    key: string,
+    value: string | ArrayBuffer | ArrayBufferView | ReadableStream,
+    options?: { httpMetadata?: { contentType?: string } }
+  ): Promise<unknown>;
 }
+
 export interface Env {
   APP_ENV: 'development' | 'production';
   AUTH_ISSUER?: string;
@@ -14,4 +18,13 @@ export interface Env {
   CURRICULUM_BUCKET?: ObjectBucket;
   CORS_ALLOWED_ORIGINS?: string;
 }
-export type Variables = { userId: string; roles: AdminRole[]; emailVerified: boolean };
+
+export type AuthenticatedUser = {
+  userId: string;
+  roles: AdminRole[];
+  emailVerified: boolean;
+};
+
+export type AuthResult =
+  | { ok: true; user: AuthenticatedUser }
+  | { ok: false; status: 401 | 403 | 410 | 503; error: string };
