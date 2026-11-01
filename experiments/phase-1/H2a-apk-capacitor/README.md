@@ -98,6 +98,8 @@ H4 ليس جزءًا من حكم نجاح H2a؛ ينفذ بعد H2a وعلى And
 
 ## سجل المحاولات والتنقيحات
 
+- **المحاولة 5 — عدم توافق JDK:** workflow run `41350896249`، commit `3ca2f6484d6714a9524f3ddbd02aa9a56dd545a0`، بتاريخ 2026-11-01. نجحت SDK setup وتوليد payload/المشروع، ونفّذ Gradle مهامه من جذر Android الصحيح لمدة 39 ثانية، لكنه فشل في `:capacitor-android:compileDebugJavaWithJavac` برسالة `invalid source release: 21`؛ لأن إعداد CI استخدم JDK 17 بينما Capacitor Android 8.6.0 يحدد `sourceCompatibility` و`targetCompatibility` إلى Java 21 في ملف `android/capacitor/build.gradle`. لم يتكون APK ولم يبدأ المحاكي. جرى تغيير JDK إلى 21 لمطابقة متطلب المصدر الفعلي؛ هذا تصحيح toolchain لا يغير معايير النجاح أو نطاق التجربة.
+
 - **المحاولة 4 — بقي أمر assemble على المسار القديم:** workflow run `41350798385`، commit `142349cb82e4c807aa5c15d1ce299b5fe71c0ad7`، بتاريخ 2026-11-01. راجع التشغيل تهيئة SDK وتوليد الأصول وبدأ Gradle، لكنه استدعى `android/gradlew` مباشرة من مجلد `h2a`؛ تعديل المحاولة السابقة غيّر أمر `--version` فقط ولم يغيّر أمر `assembleDebug`. لذلك ظل جذر Gradle هو `h2a` وانتهى البناء قبل إنشاء APK. هذا خطأ في تحديث workflow، لا فشل في checksum أو قراءة assets. أصلحت السطر المتبقي ليعمل `assembleDebug` من داخل مجلد `android`. لا تغيير في معايير الاختبار.
 
 - **المحاولة 3 — فشل جذر مشروع Gradle:** workflow run `41350655264`، commit `e9c0ece191e7ebdaa51a49ca54c2fa05db2a3d9d`، بتاريخ 2026-11-01. نجحت تهيئة SDK، وتوليد placeholder، وتثبيت تبعيات Capacitor، وإنشاء Android project، ومزامنة الأصول، وتعديل النشاط. بدأ wrapper لكن Gradle أخذ مجلد `h2a` جذرًا للبناء ولم يجد فيه `settings.gradle`؛ لأن استدعاء `android/gradlew` لم يغيّر مجلد العمل الحالي. لم ينتج APK، ولم يبدأ emulator. الإصلاح هو تنفيذ wrapper داخل subshell بعد `cd android`، وتسجيل المحاولة السابقة دون حذفها؛ لا تتغير معايير H2a.
@@ -116,7 +118,7 @@ H4 ليس جزءًا من حكم نجاح H2a؛ ينفذ بعد H2a وعلى And
 |---|---|
 | Runner image / version | ubuntu-24.04؛ ImageOS/ImageVersion يسجلان في `evidence/build.json` عند التشغيل |
 | Node / npm | Node 22.16.0؛ npm الفعلي يسجل في `evidence/build.json` |
-| JDK | JDK 17؛ الإصدار الكامل يسجل في `evidence/build.json` |
+| JDK | JDK 21؛ الإصدار الكامل يسجل في `evidence/build.json`؛ يتطلبه Capacitor 8.6.0 Android source/target compatibility |
 | Android SDK / Build Tools | Platform 36 / Build Tools 36.0.0؛ يسجل التثبيت الفعلي |
 | Gradle Wrapper / AGP | 8.14.3 / 8.13.0 من قالب Capacitor 8.6.0؛ تؤكد القيم من الملفات وسجل Gradle |
 | Capacitor | 8.6.0 (`core`/`android`/`cli`) مثبت في `h2a/package.json` |
