@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { SyncOperation } from '@fluently/domain';
+import type { CurriculumManifest } from '@fluently/content-schema';
 
 type ProgressRecord = { lessonId: string; completedStepIds: string[]; updatedAt: string; contentVersion: string };
 type ReviewRecord = { itemId: string; repetitions: number; intervalDays: number; ease: number; dueAt: string; version: 'fluently-srs-1' };
@@ -8,17 +9,21 @@ interface FluentlyDB extends DBSchema {
   outbox: { key: string; value: SyncOperation };
   reviews: { key: string; value: ReviewRecord };
   settings: { key: string; value: string | number | boolean };
+  curriculumPackages: { key: string; value: { packageId: string; contentVersion: string; manifest: CurriculumManifest; activatedAt: string } };
+  curriculumFiles: { key: string; value: { id: string; packageId: string; path: string; contentVersion: string; bytes: ArrayBuffer; sha256: string } };
 }
 let databasePromise: Promise<IDBPDatabase<FluentlyDB>> | undefined;
 
 export function openFluentlyDB(): Promise<IDBPDatabase<FluentlyDB>> {
   if (!('indexedDB' in globalThis)) throw new Error('IndexedDB is unavailable in this environment.');
-  databasePromise ??= openDB<FluentlyDB>('fluently-local', 1, {
+  databasePromise ??= openDB<FluentlyDB>('fluently-local', 2, {
     upgrade(db) {
       if (!db.objectStoreNames.contains('progress')) db.createObjectStore('progress', { keyPath: 'lessonId' });
       if (!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', { keyPath: 'operationId' });
       if (!db.objectStoreNames.contains('reviews')) db.createObjectStore('reviews', { keyPath: 'itemId' });
       if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+      if (!db.objectStoreNames.contains('curriculumPackages')) db.createObjectStore('curriculumPackages', { keyPath: 'packageId' });
+      if (!db.objectStoreNames.contains('curriculumFiles')) db.createObjectStore('curriculumFiles', { keyPath: 'id' });
     },
     blocked() { console.warn('A newer Fluently tab is waiting for the database to close.'); },
     blocking() { databasePromise = undefined; }
