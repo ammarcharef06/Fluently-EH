@@ -20,6 +20,7 @@
 | الاختبارات وبوابات الإصدار والتراجع | [الإصدارات والاختبارات](docs/RELEASE-AND-TESTING.md) | ROADMAP، متطلبات المنصات |
 | المرحلة الحالية وترتيب التنفيذ وبوابات الخروج | [خارطة الطريق](docs/ROADMAP.md) | مصفوفة التتبع |
 | العلاقة بين المتطلب والقرار والمرحلة والاختبار | [مصفوفة التتبع](TRACEABILITY-MATRIX.md) | المصادر المرجعية لكل صف |
+| حالة التنفيذ البرمجي وما اكتمل وما ينتظر اعتمادًا يدويًا | [سجل التنفيذ التكاملي](docs/IMPLEMENTATION-STATUS.md) | لا يستبدل المصفوفة أو نتائج الاختبار |
 | المساهمة وقاعدة تغيير القرارات في PR | [CONTRIBUTING](CONTRIBUTING.md) | [AGENTS](AGENTS.md) |
 | قواعد الوكلاء والمساعدين البرمجيين | [AGENTS](AGENTS.md) | DECISIONS، PRD |
 | رخصة الشيفرة والمحتوى | [LICENSE](LICENSE) و[LICENSE-CONTENT](LICENSE-CONTENT.md) | CONTRIBUTING |
