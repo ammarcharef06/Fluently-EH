@@ -48,7 +48,7 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 function isApprovedLesson(raw: unknown): boolean {
   const parsed = LessonSchema.safeParse(raw);
   if (!parsed.success) return false;
-  return parsed.data.status === 'approved' &&
+  return (parsed.data.status === 'approved' || parsed.data.status === 'published') &&
     Boolean(parsed.data.review.reviewerId && parsed.data.review.reviewedAt && parsed.data.review.approvalNote) &&
     Boolean(parsed.data.source.license && parsed.data.source.note);
 }
@@ -364,7 +364,8 @@ app.post('/v1/admin/content/:id/review', requireSession, requireRole('owner', 'r
     const result = await sql.begin(async (tx) => {
       await tx.unsafe("select set_config('app.user_id', $1, true)", [c.get('userId')]);
       const updated = await tx.unsafe(
-        "update content_items set status=$1,review_note=$2,reviewed_by=$3,reviewed_at=now(),updated_at=now() " +
+        "update content_items set status=$1,review_note=$2,reviewed_by=$3,reviewed_at=now(),updated_at=now(), " +
+        "content_json = content_json || jsonb_build_object('status',$1::text,'review',coalesce(content_json->'review','{}'::jsonb) || jsonb_build_object('reviewerId',$3::text,'reviewedAt',now()::text,'approvalNote',$2::text)) " +
         "where id=$4 and status='in_review' and created_by <> $3 returning id,status,reviewed_by,reviewed_at",
         [body.data.decision, body.data.note, c.get('userId'), c.req.param('id')]
       );
@@ -398,7 +399,9 @@ app.post('/v1/admin/content/:id/publish', requireSession, requireRole('owner', '
       const item = rows[0] as { id: string; status: string; content_version: string; reviewed_by: string | null; created_by: string } | undefined;
       if (!item || item.status !== 'approved' || !item.reviewed_by || item.reviewed_by === item.created_by || item.created_by === c.get('userId')) return null;
       const published = await tx.unsafe(
-        "update content_items set status='published',published_by=$1,published_at=now(),updated_at=now() where id=$2 and status='approved' returning id,status,content_version,published_at",
+        "update content_items set status='published',published_by=$1,published_at=now(),updated_at=now(), " +
+        "content_json = jsonb_set(content_json, '{status}', to_jsonb('published'::text)) " +
+        "where id=$2 and status='approved' returning id,status,content_version,published_at",
         [c.get('userId'), item.id]
       );
       await tx.unsafe(
