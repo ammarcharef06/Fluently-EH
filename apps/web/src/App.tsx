@@ -48,6 +48,32 @@ function App() {
     void requestPersistentStorage().then(setIsPersistent).catch(() => setIsPersistent(false));
   }, [signedIn]);
 
+  useEffect(() => {
+    if (!signedIn) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const records = await listReviewStates().catch(() => []);
+      if (!cancelled) setDueReviews(selectDueReviews(records));
+    };
+    const synchronize = async () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        if (!cancelled) setSyncStatus('offline');
+        return;
+      }
+      const result = await syncPendingOperations('/api');
+      if (!cancelled) setSyncStatus(result.status);
+      await refresh();
+    };
+    const onOnline = () => { void synchronize(); };
+    void refresh();
+    if (typeof navigator !== 'undefined' && navigator.onLine) void synchronize();
+    window.addEventListener('online', onOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', onOnline);
+    };
+  }, [signedIn]);
+
   const t = useMemo(() => {
     const ar = {
       brand: 'Fluently', subtitle: 'خطوتك الواثقة نحو الإنجليزية',
