@@ -6,7 +6,13 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    proxy: { '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true, rewrite: (path) => path.startsWith('/api') ? path.slice(4) : path } }
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+        rewrite: (requestPath: string) => requestPath.slice('/api'.length)
+      }
+    }
   },
   build: { target: 'es2022', sourcemap: true }
 });
