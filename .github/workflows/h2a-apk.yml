@@ -79,7 +79,7 @@ jobs:
 
           START_NS="$(python3 -c 'import time; print(time.monotonic_ns())')"
           set +e
-          android/gradlew --no-daemon --stacktrace clean assembleDebug -PplaceholderSha256="$EXPECTED_SHA" > gradle-build.log 2>&1
+          (cd android && ./gradlew --no-daemon --stacktrace clean assembleDebug -PplaceholderSha256="$EXPECTED_SHA") > gradle-build.log 2>&1
           GRADLE_RC=$?
           set -e
           END_NS="$(python3 -c 'import time; print(time.monotonic_ns())')"
