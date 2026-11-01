@@ -1,0 +1,80 @@
+{
+  "id": "literacy.alphabet.a",
+  "type": "lesson",
+  "title": "الحرفان A وa",
+  "description": "التعرف إلى شكل الحرف A/a واسمه وبعض كلماته الأولى.",
+  "stage": "literacy",
+  "skills": [
+    "literacy",
+    "reading",
+    "writing"
+  ],
+  "objectives": [
+    {
+      "id": "literacy.letter-a.recognition",
+      "description": "يميز المتعلم شكل الحرف الكبير A والصغير a."
+    },
+    {
+      "id": "literacy.letter-a.word",
+      "description": "يتعرف إلى كلمات أولية تبدأ بالحرف A."
+    }
+  ],
+  "prerequisites": [],
+  "estimatedMinutes": 10,
+  "steps": [
+    {
+      "id": "a-1",
+      "type": "explanation",
+      "heading": "شكل الحرف",
+      "body": "للحرف شكلان: A كبير وa صغير. انظر إلى الشكلين ولاحظ أنهما يمثلان الحرف نفسه."
+    },
+    {
+      "id": "a-2",
+      "type": "example",
+      "english": "A a",
+      "arabic": "الحرف A الكبير والحرف a الصغير.",
+      "note": "اسمه في الإنجليزية: A."
+    },
+    {
+      "id": "a-3",
+      "type": "example",
+      "english": "apple",
+      "arabic": "تفاحة",
+      "note": "تبدأ كلمة apple بالحرف A."
+    },
+    {
+      "id": "a-4",
+      "type": "choice",
+      "questionId": "literacy-a-q1",
+      "prompt": "أي شكل هو الحرف الصغير a؟",
+      "options": [
+        {
+          "id": "one",
+          "text": "A"
+        },
+        {
+          "id": "two",
+          "text": "a"
+        },
+        {
+          "id": "three",
+          "text": "B"
+        }
+      ],
+      "answerId": "two",
+      "explanation": "الحرف الصغير هو a، أما A فهو الشكل الكبير."
+    }
+  ],
+  "status": "draft",
+  "contentVersion": "0.1.0",
+  "source": {
+    "kind": "original",
+    "note": "صياغة أصلية أولية أنشئت للمراجعة التربوية واللغوية.",
+    "license": "CC BY-NC-SA 4.0 (pending owner approval)"
+  },
+  "review": {
+    "reviewerId": null,
+    "reviewedAt": null,
+    "approvalNote": null
+  }
+}
