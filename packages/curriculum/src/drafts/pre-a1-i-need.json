@@ -1,0 +1,86 @@
+{
+  "id": "pre-a1.i-need",
+  "type": "lesson",
+  "title": "استخدام I need",
+  "description": "التعبير عن الحاجة إلى شيء باستخدام I need.",
+  "stage": "pre-a1",
+  "skills": [
+    "grammar",
+    "vocabulary",
+    "writing"
+  ],
+  "objectives": [
+    {
+      "id": "pre-a1.i-need.structure",
+      "description": "يبني المتعلم عبارة I need مع اسم مناسب."
+    },
+    {
+      "id": "pre-a1.i-need.polite",
+      "description": "يضيف please إلى طلب بسيط."
+    }
+  ],
+  "prerequisites": [
+    "pre-a1.subject-pronouns"
+  ],
+  "estimatedMinutes": 10,
+  "steps": [
+    {
+      "id": "n-1",
+      "type": "explanation",
+      "heading": "التركيب",
+      "body": "نستخدم I need بمعنى أنا أحتاج. نضع بعدها الشيء الذي نحتاج إليه."
+    },
+    {
+      "id": "n-2",
+      "type": "example",
+      "english": "I need water.",
+      "arabic": "أنا أحتاج إلى الماء."
+    },
+    {
+      "id": "n-3",
+      "type": "example",
+      "english": "I need food.",
+      "arabic": "أنا أحتاج إلى الطعام."
+    },
+    {
+      "id": "n-4",
+      "type": "example",
+      "english": "I need water, please.",
+      "arabic": "أحتاج إلى الماء، من فضلك."
+    },
+    {
+      "id": "n-5",
+      "type": "choice",
+      "questionId": "need-q1",
+      "prompt": "اختر العبارة الصحيحة: أنا أحتاج إلى ماء.",
+      "options": [
+        {
+          "id": "a",
+          "text": "I water need."
+        },
+        {
+          "id": "b",
+          "text": "I need water."
+        },
+        {
+          "id": "c",
+          "text": "Need I water."
+        }
+      ],
+      "answerId": "b",
+      "explanation": "الترتيب هنا: I ثم need ثم اسم الشيء."
+    }
+  ],
+  "status": "draft",
+  "contentVersion": "0.1.0",
+  "source": {
+    "kind": "original",
+    "note": "صياغة أصلية أولية أنشئت للمراجعة التربوية واللغوية.",
+    "license": "CC BY-NC-SA 4.0 (pending owner approval)"
+  },
+  "review": {
+    "reviewerId": null,
+    "reviewedAt": null,
+    "approvalNote": null
+  }
+}

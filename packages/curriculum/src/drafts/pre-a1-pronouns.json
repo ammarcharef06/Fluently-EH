@@ -1,0 +1,93 @@
+{
+  "id": "pre-a1.subject-pronouns",
+  "type": "lesson",
+  "title": "ضمائر الفاعل الأساسية",
+  "description": "التعرف إلى I وYou وHe وShe وWe وThey في جمل قصيرة.",
+  "stage": "pre-a1",
+  "skills": [
+    "grammar",
+    "vocabulary",
+    "reading"
+  ],
+  "objectives": [
+    {
+      "id": "pre-a1.pronouns.meaning",
+      "description": "يربط المتعلم ضمائر الفاعل بمعانيها الأساسية."
+    },
+    {
+      "id": "pre-a1.pronouns.context",
+      "description": "يختار الضمير المناسب بحسب الشخص أو المجموعة."
+    }
+  ],
+  "prerequisites": [
+    "literacy.alphabet.a"
+  ],
+  "estimatedMinutes": 12,
+  "steps": [
+    {
+      "id": "p-1",
+      "type": "explanation",
+      "heading": "ما ضمير الفاعل؟",
+      "body": "ضمير الفاعل كلمة تحل محل اسم الشخص أو المجموعة الذي يقوم بالفعل."
+    },
+    {
+      "id": "p-2",
+      "type": "example",
+      "english": "I = أنا",
+      "arabic": "أنا"
+    },
+    {
+      "id": "p-3",
+      "type": "example",
+      "english": "You = أنتَ أو أنتِ أو أنتم",
+      "arabic": "أنتَ أو أنتِ أو أنتم",
+      "note": "يتحدد المقصود من سياق الحديث."
+    },
+    {
+      "id": "p-4",
+      "type": "example",
+      "english": "He = هو / She = هي",
+      "arabic": "هو / هي"
+    },
+    {
+      "id": "p-5",
+      "type": "example",
+      "english": "We = نحن / They = هم",
+      "arabic": "نحن / هم"
+    },
+    {
+      "id": "p-6",
+      "type": "choice",
+      "questionId": "pronouns-q1",
+      "prompt": "أي ضمير يعني «هي»؟",
+      "options": [
+        {
+          "id": "a",
+          "text": "He"
+        },
+        {
+          "id": "b",
+          "text": "She"
+        },
+        {
+          "id": "c",
+          "text": "We"
+        }
+      ],
+      "answerId": "b",
+      "explanation": "She تعني هي عند الحديث عن مؤنث مفرد."
+    }
+  ],
+  "status": "draft",
+  "contentVersion": "0.1.0",
+  "source": {
+    "kind": "original",
+    "note": "صياغة أصلية أولية أنشئت للمراجعة التربوية واللغوية.",
+    "license": "CC BY-NC-SA 4.0 (pending owner approval)"
+  },
+  "review": {
+    "reviewerId": null,
+    "reviewedAt": null,
+    "approvalNote": null
+  }
+}
