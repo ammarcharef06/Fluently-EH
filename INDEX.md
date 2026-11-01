@@ -42,6 +42,18 @@
 
 استخدم المصطلحين العربيين أعلاه باستمرار. لا تستخدم "preloaded" أو "bundled" أو "embedded" بالتبادل عند وصف مسار وصول المحتوى؛ كلمة Embedded تقابل "مضمّنة" فقط، وكلمة Downloaded تقابل "منزّلة" فقط.
 
+### جدول المرادفات المسموح بها
+
+| المصطلح المعتمد | مرادفات إنجليزية مقبولة | لا تستخدم بدلًا منه |
+|---|---|---|
+| حزمة المنهج المضمّنة | Embedded Curriculum Package، native embedded package | preloaded أو downloaded |
+| حزمة المنهج المنزّلة عند أول استخدام | First-run Downloaded Curriculum Package، web first-run download | embedded أو bundled |
+| تحديث المحتوى | Content Update، curriculum update | application update |
+| ملف التثبيت/التوزيع | installer / distribution artifact | لا تستخدم package وحدها إذا كان المقصود APK/EXE |
+| ملف الحزمة | curriculum package file / ZIP archive | لا تخلطه مع ملف APK/EXE الحاوي للحزمة |
+
+استخدم **مضمّنة** لوصف حزمة المنهج الموجودة داخل APK/توزيع Windows قبل تثبيتهما، و**منزّلة** لوصف حزمة المنهج التي يجلبها Web/PWA عند أول استخدام. لا تستخدم "preloaded" لأنها قد تعني التنزيل المسبق أو التضمين بحسب السياق.
+
 ## حالة المستودع
 
 المستودع في المرحلة 1 — إثبات الجدوى التقنية. النماذج التجريبية لا تعني أن تطبيق المتعلم جاهز أو صالح للإطلاق.
