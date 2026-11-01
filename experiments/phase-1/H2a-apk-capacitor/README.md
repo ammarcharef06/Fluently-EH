@@ -3,7 +3,7 @@
 **الحالة قبل التنفيذ:** المعايير مسجلة؛ لا توجد نتيجة بعد.  
 **تاريخ تسجيل المعايير:** 2026-11-01.  
 **الموعد النهائي:** 2026-11-08، 23:59 بتوقيت Africa/Algiers.  
-**النطاق:** Android APK عبر Capacitor على GitHub Actions. لا يشمل Windows/Tauri.
+**النطاق:** Android APK عبر Capacitor على GitHub Actions، باستخدام runner `ubuntu-24.04` مُدار ومثبت الاسم. تُسجل `ImageOS` و`ImageVersion` الفعليتان من runner. لا يشمل Windows/Tauri.
 
 ## السؤال القابل للتكذيب
 
@@ -27,10 +27,10 @@
 6. **تحقق CI آلي:** يلتقط job التثبيت Logcat من العملية نفسها، ويقارن قيمة `CHECKSUM` مع قيمة SHA-256 القادمة من job البناء. يفشل job عند ظهور `RESULT:MISMATCH` أو غياب أي من الوسمين أو تكرارهما أو اختلاف checksum، ولا يعتمد على فحص بشري للسجل.
 7. **التثبيت والتشغيل:** يُثبت APK ويُطلق على Android Emulator واحد على الأقل. يتم هذا في job مستقل عن job البناء ويستخدم artifact APK نفسه دون إعادة بناء.
 8. **الأرقام الإلزامية:** تسجل الأدلة حجم APK النهائي بالبايت وMiB، زمن Gradle build بالثواني، زمن adb install بالثواني، زمن الإطلاق حتى ظهور checksum، حجم placeholder، وقيمة SHA-256.
-9. **البيئة القابلة للتكرار:** تسجل الأدلة صورة runner الفعلية وإصدارات Node/npm وJDK وAndroid SDK/Build Tools وGradle Wrapper وAndroid Gradle Plugin (AGP) وCapacitor، مع الاحتفاظ بـ Gradle logs وقياسات workflow.
+9. **البيئة القابلة للتكرار:** تسجل الأدلة اسم runner المثبت ubuntu-24.04 وصورة runner الفعلية (ImageOS/ImageVersion) وإصدارات Node/npm وJDK وAndroid SDK/Build Tools وGradle Wrapper وAndroid Gradle Plugin (AGP) وCapacitor، مع الاحتفاظ بـ Gradle logs وقياسات workflow.
 10. **نوع التوقيع:** H2a يقيس **debug signing فقط**. لا يثبت قابلية توقيع إصدار Android الإنتاجي أو نشره.
 
-**حد H2a مقابل H4:** هذا الاختبار يثبت البناء والاحتواء والقراءة ومطابقة placeholder داخل APK. لا يحتوي على manifest حزمة منهج ولا يختبر رفض تعديل payload. حد الرفض الذي يميز H4 هو تعديل **بايت واحد** داخل payload المضمّن مع إبقاء manifest/hash المتوقع الأصليين، ثم وجوب أن يطبع التطبيق `RESULT:MISMATCH` ويرفض التفعيل. لا يُنسب هذا الإثبات إلى H2a.
+**حد H2a مقابل H4:** هذا الاختبار يثبت البناء والاحتواء والقراءة ومطابقة placeholder داخل APK. لا يحتوي على manifest حزمة منهج ولا يختبر رفض تعديل payload. حد الرفض الذي يميز H4 هو إنشاء نسخة اختبار معدّلة بتغيير **بايت واحد قبل تغليف APK**، مع إبقاء manifest/hash المتوقع الأصليين، ثم بناء APK جديد وتوقيعه debug signing بصورة طبيعية. يجب أن يقرأ التطبيق payload من داخل APK ويطبع `RESULT:MISMATCH` ويرفض تفعيل الحزمة. لا تُعدّل بايتات ملف APK بعد توقيعه؛ ذلك يختبر كسر توقيع APK لا منطق سلامة حزمة المنهج. لا يُنسب هذا الإثبات إلى H2a.
 
 ## حالات النتيجة
 
