@@ -28,4 +28,4 @@ for (const file of files) {
   for (const pattern of forbidden) if (pattern.test(text)) matches.push(file + ': possible secret pattern ' + pattern);
 }
 if (matches.length) { console.error(matches.join('\n')); process.exit(1); }
-console.log('Secret-pattern scan passed across ' + files.length + ' source/documentation files. This is not a substitute for provider-side secret scanning.');
+console.warn('Secret-pattern scan passed across ' + files.length + ' source/documentation files. This is not a substitute for provider-side secret scanning.');
