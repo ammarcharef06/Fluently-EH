@@ -98,6 +98,8 @@ H4 ليس جزءًا من حكم نجاح H2a؛ ينفذ بعد H2a وعلى And
 
 ## سجل المحاولات والتنقيحات
 
+- **المحاولة 4 — بقي أمر assemble على المسار القديم:** workflow run `41350798385`، commit `142349cb82e4c807aa5c15d1ce299b5fe71c0ad7`، بتاريخ 2026-11-01. راجع التشغيل تهيئة SDK وتوليد الأصول وبدأ Gradle، لكنه استدعى `android/gradlew` مباشرة من مجلد `h2a`؛ تعديل المحاولة السابقة غيّر أمر `--version` فقط ولم يغيّر أمر `assembleDebug`. لذلك ظل جذر Gradle هو `h2a` وانتهى البناء قبل إنشاء APK. هذا خطأ في تحديث workflow، لا فشل في checksum أو قراءة assets. أصلحت السطر المتبقي ليعمل `assembleDebug` من داخل مجلد `android`. لا تغيير في معايير الاختبار.
+
 - **المحاولة 3 — فشل جذر مشروع Gradle:** workflow run `41350655264`، commit `e9c0ece191e7ebdaa51a49ca54c2fa05db2a3d9d`، بتاريخ 2026-11-01. نجحت تهيئة SDK، وتوليد placeholder، وتثبيت تبعيات Capacitor، وإنشاء Android project، ومزامنة الأصول، وتعديل النشاط. بدأ wrapper لكن Gradle أخذ مجلد `h2a` جذرًا للبناء ولم يجد فيه `settings.gradle`؛ لأن استدعاء `android/gradlew` لم يغيّر مجلد العمل الحالي. لم ينتج APK، ولم يبدأ emulator. الإصلاح هو تنفيذ wrapper داخل subshell بعد `cd android`، وتسجيل المحاولة السابقة دون حذفها؛ لا تتغير معايير H2a.
 
 - **المحاولة 2 — فشل تحديد مسار Gradle Wrapper:** workflow run `41350567708`، commit `8bddb264b31d8dfc41600c46cadc9e70d748f530`، بتاريخ 2026-11-01. نجحت تهيئة Android SDK، وتوليد placeholder بحجم 134,217,728 بايت، وتثبيت تبعيات Capacitor، وإنشاء Android project، ومزامنة الأصول، وتعديل MainActivity بنجاح. توقفت قبل Gradle لأن workflow استدعى `./gradlew` من مجلد `h2a`، بينما الملف المولد يقع داخل `h2a/android/gradlew`. لم ينشأ APK ولم يبدأ Gradle build أو المحاكي. الإصلاح يوجّه الاستدعاء إلى `android/gradlew` ويسجل المحاولة السابقة دون حذفها؛ لا يغير معايير القبول.
