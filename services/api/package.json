@@ -10,12 +10,11 @@
   },
   "dependencies": {
     "@fluently/content-schema": "1.0.0",
-    "hono": "4.7.2",
     "jose": "6.0.10",
     "postgres": "3.4.5",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "wrangler": "4.5.0"
+    "wrangler": "4.156.0"
   }
 }
