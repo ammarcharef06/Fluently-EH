@@ -4,8 +4,12 @@ import { resolve, join } from 'node:path';
 
 const source = resolve('packages/curriculum/src/approved');
 const output = resolve('artifacts/curriculum');
-let lessonFiles = [];
-try { lessonFiles = (await readdir(source)).filter((name) => name.endsWith('.json')); } catch { lessonFiles = []; }
+const lessonFiles = await readdir(source)
+  .then((entries) => entries.filter((name) => name.endsWith('.json')))
+  .catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
 if (lessonFiles.length === 0) {
   console.error('Refusing to create a publishable curriculum bundle: there are no human-approved lessons.');
   process.exit(2);
