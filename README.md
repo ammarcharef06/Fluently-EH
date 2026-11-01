@@ -61,6 +61,16 @@
 - [مواصفات محرر المحتوى](docs/CONTENT-EDITOR.md)
 - [تجربة المستخدم وإمكانية الوصول](docs/UX-AND-ACCESSIBILITY.md)
 
+## وثائق البنية والتشغيل
+
+- [معمارية النظام](docs/ARCHITECTURE.md)
+- [العمل دون اتصال والمزامنة](docs/OFFLINE-AND-SYNC.md)
+- [الأمان والخصوصية](docs/SECURITY-AND-PRIVACY.md)
+- [البنية التحتية والتكاليف](docs/INFRASTRUCTURE-AND-COSTS.md)
+- [الإصدارات والاختبارات](docs/RELEASE-AND-TESTING.md)
+- [خارطة الطريق](docs/ROADMAP.md)
+- [مصفوفة المنصات وتتبع المتطلبات](docs/PARITY.md)
+
 ## المساهمة
 
 المساهمات المجتمعية مرحب بها عبر Issues وPull Requests. لا يُدمج أي تغيير قبل المراجعة والاختبارات المطلوبة وموافقة المسؤولين المخولين. راجع [CONTRIBUTING.md](CONTRIBUTING.md).
