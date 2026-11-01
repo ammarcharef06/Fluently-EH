@@ -72,7 +72,7 @@ jobs:
           npm --version > evidence/npm-version.txt
           java -version 2> evidence/java-version.txt
           printf 'ImageOS=%s\nImageVersion=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}" > evidence/runner-image.txt
-          android/gradlew --version > evidence/gradle-version.txt
+          (cd android && ./gradlew --version) > evidence/gradle-version.txt
           grep -Eo 'com.android.tools.build:gradle:[0-9.]+' android/build.gradle | head -n 1 > evidence/agp-version.txt
           grep -Eo 'gradle-[0-9.]+-(all|bin)\.zip' android/gradle/wrapper/gradle-wrapper.properties > evidence/gradle-wrapper-version.txt
           sdkmanager --list_installed > evidence/android-sdk-packages.txt
