@@ -70,6 +70,7 @@
 - [الإصدارات والاختبارات](docs/RELEASE-AND-TESTING.md)
 - [خارطة الطريق](docs/ROADMAP.md)
 - [مصفوفة المنصات وتتبع المتطلبات](docs/PARITY.md)
+- [متطلبات المنصات التفصيلية](docs/PLATFORM-REQUIREMENTS.md)
 
 ## المساهمة
 
