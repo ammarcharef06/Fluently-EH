@@ -2,7 +2,6 @@ import { CurriculumManifestSchema, verifyPackageFiles, type CurriculumManifest }
 import { openFluentlyDB } from './index';
 
 type StoredPackage = { packageId: string; contentVersion: string; manifest: CurriculumManifest; activatedAt: string };
-type StoredFile = { id: string; packageId: string; path: string; contentVersion: string; bytes: ArrayBuffer; sha256: string };
 
 export async function activateCurriculumPackage(
   manifestInput: unknown,
