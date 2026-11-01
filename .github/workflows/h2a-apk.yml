@@ -72,14 +72,14 @@ jobs:
           npm --version > evidence/npm-version.txt
           java -version 2> evidence/java-version.txt
           printf 'ImageOS=%s\nImageVersion=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}" > evidence/runner-image.txt
-          ./gradlew --version > evidence/gradle-version.txt
+          android/gradlew --version > evidence/gradle-version.txt
           grep -Eo 'com.android.tools.build:gradle:[0-9.]+' android/build.gradle | head -n 1 > evidence/agp-version.txt
           grep -Eo 'gradle-[0-9.]+-(all|bin)\.zip' android/gradle/wrapper/gradle-wrapper.properties > evidence/gradle-wrapper-version.txt
           sdkmanager --list_installed > evidence/android-sdk-packages.txt
 
           START_NS="$(python3 -c 'import time; print(time.monotonic_ns())')"
           set +e
-          ./gradlew --no-daemon --stacktrace clean assembleDebug -PplaceholderSha256="$EXPECTED_SHA" > gradle-build.log 2>&1
+          android/gradlew --no-daemon --stacktrace clean assembleDebug -PplaceholderSha256="$EXPECTED_SHA" > gradle-build.log 2>&1
           GRADLE_RC=$?
           set -e
           END_NS="$(python3 -c 'import time; print(time.monotonic_ns())')"
