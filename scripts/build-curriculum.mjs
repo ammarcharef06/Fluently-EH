@@ -29,4 +29,4 @@ const manifest = {
 await mkdir(output, { recursive: true });
 await writeFile(join(output, 'content.json'), payload);
 await writeFile(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-console.log('Created reviewed curriculum bundle with ' + lessons.length + ' lesson(s), sha256=' + digest);
+console.warn('Created reviewed curriculum bundle with ' + lessons.length + ' lesson(s), sha256=' + digest);
