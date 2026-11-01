@@ -45,6 +45,8 @@
 
 ## وثائق المشروع
 
+- [خريطة مصادر الحقيقة](INDEX.md)
+- [مصفوفة تتبع المتطلبات الوحيدة](TRACEABILITY-MATRIX.md)
 - [ميثاق المشروع](docs/PROJECT-CHARTER.md)
 - [متطلبات المنتج](docs/PRD.md)
 - [سجل القرارات](docs/DECISIONS.md)
