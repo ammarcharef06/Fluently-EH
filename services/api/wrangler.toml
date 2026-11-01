@@ -12,3 +12,7 @@ CORS_ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:5174"
 
 # Never put secrets or signing keys in this file.
 # Configure HYPERDRIVE and CURRICULUM_BUCKET only after no-card/no-billing review.
+
+[dev]
+port = 8787
+local_protocol = "http"

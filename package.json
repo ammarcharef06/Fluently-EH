@@ -11,7 +11,7 @@
     "services/api"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @fluently/web",
+    "dev": "node scripts/dev-stack.mjs",
     "dev:admin": "npm run dev --workspace @fluently/admin",
     "build": "npm run build --workspace @fluently/web && npm run build --workspace @fluently/admin",
     "typecheck": "tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json && tsc --noEmit -p services/api/tsconfig.json && tsc --noEmit -p packages/domain/tsconfig.json && tsc --noEmit -p packages/content-schema/tsconfig.json && tsc --noEmit -p packages/storage-web/tsconfig.json && tsc --noEmit -p packages/curriculum/tsconfig.json",
@@ -20,7 +20,10 @@
     "security:check": "node scripts/security-check.mjs",
     "content:validate": "node scripts/validate-curriculum.mjs",
     "content:build": "node scripts/build-curriculum.mjs",
-    "check": "npm run typecheck && npm test && npm run lint && npm run security:check && npm run content:validate"
+    "check": "npm run typecheck && npm test && npm run lint && npm run security:check && npm run content:validate",
+    "dev:web": "npm run dev --workspace @fluently/web",
+    "dev:api": "npm run dev --workspace @fluently/api",
+    "build:android": "npm run build:web && npm run sync --workspace @fluently/android"
   },
   "devDependencies": {
     "@eslint/js": "9.22.0",
