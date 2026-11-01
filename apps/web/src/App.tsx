@@ -408,17 +408,18 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   return <div className="empty-state"><div><BookOpen size={23} /></div><strong>{title}</strong><p>{text}</p></div>;
 }
 
-function ChoiceActivity({ step, onComplete, t }: { step: Extract<Lesson['steps'][number], { type: 'choice' }>; onComplete: () => void; t: Record<string, string> }) {
+function ChoiceActivity({ step, objectiveId, onAttempt, onComplete, t }: { step: Extract<Lesson['steps'][number], { type: 'choice' }>; objectiveId: string; onAttempt: (correct: boolean) => void; onComplete: () => void; t: Record<string, string> }) {
   const [selected, setSelected] = useState('');
   const [feedback, setFeedback] = useState<{ correct: boolean; text: string } | null>(null);
   function check() {
     const question: ChoiceQuestion = {
-      id: step.questionId, objectiveId: 'preview.objective', prompt: step.prompt,
+      id: step.questionId, objectiveId, prompt: step.prompt,
       options: step.options, correctOptionId: step.answerId,
       explanationCorrect: step.explanation, explanationIncorrect: 'هذه ليست الإجابة المطلوبة. ' + step.explanation
     };
     const result = gradeChoice(question, selected);
     setFeedback({ correct: result.correct, text: result.feedback });
+    onAttempt(result.correct);
     if (result.correct) onComplete();
   }
   return <div className="choice-activity"><span className="step-type"><CircleHelp size={16} />{t.objective}</span><h2>{step.prompt}</h2><div className="choice-options">{step.options.map((option) => <button key={option.id} className={selected === option.id ? 'choice-option selected' : 'choice-option'} onClick={() => { setSelected(option.id); setFeedback(null); }}><span className="choice-radio">{selected === option.id ? <Check size={14} /> : null}</span>{option.text}</button>)}</div><button className="button button-primary" disabled={!selected} onClick={check}>{t.answer}</button>{feedback && <div className={feedback.correct ? 'feedback correct' : 'feedback incorrect'}>{feedback.correct ? <CheckCircle2 size={18} /> : <CircleHelp size={18} />}{feedback.text}</div>}</div>;
