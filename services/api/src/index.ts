@@ -80,24 +80,46 @@ app.all('/v1/auth/*', (c) => c.json({
   message: 'Sign-in endpoints remain disabled until an identity and email provider passes the no-card/no-billing review.'
 }, 503));
 
-app.get('/v1/curriculum/manifest', async (c) => {
+app.get('/v1/curriculum/manifest', requireSession, async (c) => {
   const bucket = c.env.CURRICULUM_BUCKET;
   if (!bucket) return c.json({ error: 'curriculum_storage_not_configured' }, 503);
-  const object = await bucket.get('published/manifest.json');
-  if (!object) return c.json({ error: 'no_published_curriculum' }, 404);
-  return new Response(object.body, {
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60', ETag: object.httpEtag }
-  });
+  let sql;
+  try { sql = getDatabase(c.env); }
+  catch { return c.json({ error: 'database_not_configured' }, 503); }
+  try {
+    const rows = await sql.unsafe(
+      "select id from curriculum_releases where package_id='fluently.core' and status='published' order by published_at desc limit 1"
+    );
+    if (!rows.length) return c.json({ error: 'no_published_curriculum' }, 404);
+    const object = await bucket.get('published/' + rows[0].id + '/manifest.json');
+    if (!object) return c.json({ error: 'published_manifest_missing' }, 503);
+    return new Response(object.body, {
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=60', ETag: object.httpEtag }
+    });
+  } finally {
+    await sql.end({ timeout: 1 });
+  }
 });
 
-app.get('/v1/curriculum/content.json', async (c) => {
+app.get('/v1/curriculum/content.json', requireSession, async (c) => {
   const bucket = c.env.CURRICULUM_BUCKET;
   if (!bucket) return c.json({ error: 'curriculum_storage_not_configured' }, 503);
-  const object = await bucket.get('published/content.json');
-  if (!object) return c.json({ error: 'no_published_curriculum' }, 404);
-  return new Response(object.body, {
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60', ETag: object.httpEtag }
-  });
+  let sql;
+  try { sql = getDatabase(c.env); }
+  catch { return c.json({ error: 'database_not_configured' }, 503); }
+  try {
+    const rows = await sql.unsafe(
+      "select id from curriculum_releases where package_id='fluently.core' and status='published' order by published_at desc limit 1"
+    );
+    if (!rows.length) return c.json({ error: 'no_published_curriculum' }, 404);
+    const object = await bucket.get('published/' + rows[0].id + '/content.json');
+    if (!object) return c.json({ error: 'published_content_missing' }, 503);
+    return new Response(object.body, {
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=60', ETag: object.httpEtag }
+    });
+  } finally {
+    await sql.end({ timeout: 1 });
+  }
 });
 
 app.get('/v1/me', requireSession, (c) => c.json({
@@ -468,8 +490,8 @@ app.post('/v1/admin/releases/:id/publish', requireSession, requireRole('owner', 
       const stagedContent = await bucket.get('staged/' + release.id + '/content.json');
       const stagedManifest = await bucket.get('staged/' + release.id + '/manifest.json');
       if (!stagedContent || !stagedManifest) throw new Error('staged_release_files_missing');
-      await bucket.put('published/content.json', stagedContent.body, { httpMetadata: { contentType: 'application/json' } });
-      await bucket.put('published/manifest.json', stagedManifest.body, { httpMetadata: { contentType: 'application/json' } });
+      await bucket.put('published/' + release.id + '/content.json', stagedContent.body, { httpMetadata: { contentType: 'application/json' } });
+      await bucket.put('published/' + release.id + '/manifest.json', stagedManifest.body, { httpMetadata: { contentType: 'application/json' } });
       await tx.unsafe("update curriculum_releases set status='retired' where package_id=$1 and status='published'", [release.package_id]);
       const published = await tx.unsafe(
         "update curriculum_releases set status='published',published_by=$1,published_at=now() where id=$2 and status='staged' returning id,package_id,content_version,package_sha256,published_at",
