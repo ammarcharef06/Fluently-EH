@@ -366,7 +366,9 @@ app.post('/v1/admin/content/:id/review', requireSession, requireRole('owner', 'r
       const updated = await tx.unsafe(
         "update content_items set status=$1,review_note=$2,reviewed_by=$3,reviewed_at=now(),updated_at=now(), " +
         "content_json = content_json || jsonb_build_object('status',$1::text,'review',coalesce(content_json->'review','{}'::jsonb) || jsonb_build_object('reviewerId',$3::text,'reviewedAt',now()::text,'approvalNote',$2::text)) " +
-        "where id=$4 and status='in_review' and created_by <> $3 returning id,status,reviewed_by,reviewed_at",
+        "where id=$4 and status='in_review' and created_by <> $3 " +
+        "and ($1 <> 'approved' or (trim(coalesce(source_metadata->>'license','')) <> '' and lower(source_metadata->>'license') not like '%pending%' and trim(coalesce(source_metadata->>'note','')) <> '')) " +
+        "returning id,status,reviewed_by,reviewed_at",
         [body.data.decision, body.data.note, c.get('userId'), c.req.param('id')]
       );
       if (!updated.length) return null;
@@ -397,7 +399,7 @@ app.post('/v1/admin/content/:id/publish', requireSession, requireRole('owner', '
         [c.req.param('id')]
       );
       const item = rows[0] as { id: string; status: string; content_version: string; reviewed_by: string | null; created_by: string } | undefined;
-      if (!item || item.status !== 'approved' || !item.reviewed_by || item.reviewed_by === item.created_by || item.created_by === c.get('userId')) return null;
+      if (!item || item.status !== 'approved' || !item.reviewed_by || item.reviewed_by === item.created_by || item.created_by === c.get('userId') || item.reviewed_by === c.get('userId')) return null;
       const published = await tx.unsafe(
         "update content_items set status='published',published_by=$1,published_at=now(),updated_at=now(), " +
         "content_json = jsonb_set(content_json, '{status}', to_jsonb('published'::text)) " +
@@ -432,10 +434,12 @@ app.post('/v1/admin/releases', requireSession, requireRole('owner', 'publisher')
       const existing = await tx.unsafe("select id from curriculum_releases where package_id='fluently.core' and content_version=$1", [body.data.contentVersion]);
       if (existing.length) return { conflict: true as const };
       const rows = await tx.unsafe(
-        "select id,content_json,source_metadata from content_items where status in ('approved','published') order by id"
+        "select id,content_json,source_metadata,created_by::text as created_by,reviewed_by::text as reviewed_by " +
+        "from content_items where status in ('approved','published') order by id"
       );
       const lessons = rows.map((row) => row.content_json);
       if (lessons.length === 0 || !lessons.every(isApprovedLesson)) return { empty: true as const };
+      if (rows.some((row) => !row.reviewed_by || row.reviewed_by === row.created_by || row.reviewed_by === c.get('userId'))) return { separationError: true as const };
       const contentBytes = new TextEncoder().encode(JSON.stringify({
         packageId: 'fluently.core', contentVersion: body.data.contentVersion, lessons
       }, null, 2));
@@ -467,6 +471,7 @@ app.post('/v1/admin/releases', requireSession, requireRole('owner', 'publisher')
     if ('conflict' in release) return c.json({ error: 'release_version_exists' }, 409);
     if ('empty' in release) return c.json({ error: 'no_human_approved_content' }, 409);
     if ('rightsError' in release) return c.json({ error: 'missing_content_rights' }, 409);
+    if ('separationError' in release) return c.json({ error: 'reviewer_and_publisher_must_be_separate' }, 409);
     return c.json({ release: release.item }, 201);
   } catch {
     return c.json({ error: 'release_build_failed' }, 503);
