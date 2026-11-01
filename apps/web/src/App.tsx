@@ -372,6 +372,7 @@ function App() {
               <div className="setting-row"><div><strong>{t.language}</strong><small>{locale === 'ar' ? 'العربية' : 'English'}</small></div><button className="button button-secondary" onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}>{locale === 'ar' ? 'English' : 'العربية'}</button></div>
               <div className="setting-row"><div><strong>{t.dark}</strong><small>{theme === 'light' ? t.light : t.dark}</small></div><button className="button button-secondary" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? t.dark : t.light}</button></div>
               <div className="setting-row"><div><strong>تخزين المتصفح</strong><small>{isPersistent ? t.persistent : t.notPersistent}</small></div><span className="setting-check">{isPersistent ? <CheckCircle2 size={19} /> : <CircleHelp size={19} />}</span></div>
+              <div className="setting-row"><div><strong>حالة المزامنة</strong><small>{syncStatus}</small></div><button className="button button-secondary" onClick={() => void syncNow()}>مزامنة الآن</button></div>
               <div className="setting-row"><div><strong>{t.admin}</strong><small>/admin — separate build target</small></div><a className="button button-secondary" href="/admin/">Open</a></div>
               <p className="privacy-note">{t.noMicrophone}</p>
             </div>
