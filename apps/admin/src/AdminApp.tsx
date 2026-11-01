@@ -9,6 +9,15 @@ const roleDescriptions: Record<AdminRole, string> = {
   publisher: 'مسؤول النشر: بناء الحزم المنشورة وفحصها والتراجع عنها.'
 };
 
+const navigation: Array<[string, string]> = [
+  ['overview', 'نظرة عامة'],
+  ['content', 'المحتوى والمسودات'],
+  ['review', 'المراجعة والاعتماد'],
+  ['publishing', 'إصدارات الحزم'],
+  ['people', 'الموظفون والأدوار'],
+  ['audit', 'سجل التدقيق']
+];
+
 export default function AdminApp() {
   const [section, setSection] = useState('overview');
   const [status, setStatus] = useState('auth-disabled');
@@ -38,11 +47,7 @@ export default function AdminApp() {
       <aside className="admin-sidebar">
         <div className="admin-brand"><div>F</div><span><strong>Fluently</strong><small>منصة الإدارة</small></span></div>
         <nav>
-          {[
-            ['overview', 'نظرة عامة'], ['content', 'المحتوى والمسودات'],
-            ['review', 'المراجعة والاعتماد'], ['publishing', 'إصدارات الحزم'],
-            ['people', 'الموظفون والأدوار'], ['audit', 'سجل التدقيق']
-          ].map(([id, label]) => <button key={id} className={section === id ? 'selected' : ''} onClick={() => setSection(id)}>{label}</button>)}
+          {navigation.map(([id, label]) => <button key={id} className={section === id ? 'selected' : ''} onClick={() => setSection(id)}>{label}</button>)}
         </nav>
         <small className="admin-version">Admin · 0.1.0</small>
       </aside>
