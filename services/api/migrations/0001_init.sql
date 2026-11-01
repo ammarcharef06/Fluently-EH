@@ -323,6 +323,9 @@ create policy content_versions_editor_insert on content_versions
   );
 
 alter table curriculum_releases enable row level security;
+drop policy if exists curriculum_releases_public_read on curriculum_releases;
+create policy curriculum_releases_public_read on curriculum_releases
+  for select using (status = 'published');
 alter table curriculum_releases force row level security;
 drop policy if exists curriculum_releases_publisher on curriculum_releases;
 create policy curriculum_releases_publisher on curriculum_releases
