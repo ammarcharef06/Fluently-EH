@@ -1,0 +1,267 @@
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, ChevronLeft, CircleHelp,
+  Clock3, CloudOff, Flame, GraduationCap, Home, Layers3, Moon, Play,
+  Settings2, ShieldCheck, Sparkles, Sun, Target, Volume2, X
+} from 'lucide-react';
+import { draftLessons, curriculumStages } from '@fluently/curriculum';
+import { gradeChoice, type ChoiceQuestion } from '@fluently/domain';
+import {
+  listLessonProgress, readLessonProgress, requestPersistentStorage, saveLessonProgress
+} from '@fluently/storage-web';
+import type { Lesson } from '@fluently/content-schema';
+
+type Screen = 'home' | 'path' | 'lesson' | 'review' | 'settings';
+type Locale = 'ar' | 'en';
+const DEMO_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO !== 'false';
+
+function App() {
+  const [signedIn] = useState(DEMO_ENABLED);
+  const [screen, setScreen] = useState<Screen>('home');
+  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [completed, setCompleted] = useState<string[]>([]);
+  const [progressCount, setProgressCount] = useState(0);
+  const [locale, setLocale] = useState<Locale>('ar');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [demoNotice, setDemoNotice] = useState(true);
+  const [isPersistent, setIsPersistent] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.dataset.theme = theme;
+  }, [locale, theme]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    void listLessonProgress()
+      .then((items) => setProgressCount(items.filter((item) => item.completedStepIds.length > 0).length))
+      .catch(() => undefined);
+    void requestPersistentStorage().then(setIsPersistent).catch(() => setIsPersistent(false));
+  }, [signedIn]);
+
+  const t = useMemo(() => {
+    const ar = {
+      brand: 'Fluently', subtitle: 'خطوتك الواثقة نحو الإنجليزية',
+      greeting: 'أهلًا بك في رحلتك', hero: 'ابدأ من الصفر، وتقدّم بثبات.',
+      heroText: 'تعلّم الإنجليزية الأمريكية بخطة واضحة، ودروس قصيرة، ومراجعة متدرجة.',
+      continue: 'تابع التعلّم', path: 'المسار التعليمي', review: 'المراجعة اليومية',
+      library: 'مكتبة الدروس', home: 'الرئيسية', goals: 'هدف اليوم', minutes: '10 دقائق',
+      stages: 'مراحل رحلتك', seeAll: 'عرض المسار', progress: 'تقدّمك', lessons: 'دروس بدأت',
+      streak: 'استمرارية التعلّم', days: 'يوم', mastery: 'الإتقان أهم من السرعة',
+      draft: 'مسودة للمراجعة البشرية', offline: 'التعلّم المحلي',
+      offlineText: 'يحفظ التقدم على هذا الجهاز.', storage: 'تخزين المتصفح',
+      persistent: 'طلبنا الاحتفاظ الدائم بالتخزين', notPersistent: 'قد يزيل المتصفح البيانات عند ضيق المساحة',
+      back: 'رجوع', next: 'التالي', finish: 'إنهاء الدرس', correct: 'إجابة صحيحة',
+      incorrect: 'راجع الشرح ثم حاول مجددًا', answer: 'تحقق من الإجابة',
+      step: 'الخطوة', of: 'من', settings: 'الإعدادات', language: 'لغة الواجهة',
+      dark: 'الوضع الداكن', light: 'الوضع الفاتح', demo: 'وضع معاينة تطويري — المحتوى الظاهر مسودات تعليمية غير منشورة.',
+      loginTitle: 'ابدأ رحلتك مع Fluently', loginText: 'يتطلب الاستخدام الكامل تسجيل دخول أول مرة ثم تنزيل حزمة المنهج.',
+      authPending: 'إعداد تسجيل الدخول قيد الاعتماد اليدوي',
+      authText: 'لم نفعّل مزود هوية أو بريد قبل التحقق من شروط البطاقة والفوترة والمجانية.',
+      admin: 'لوحة الإدارة مستقلة', noContent: 'لا توجد دروس منشورة حتى الآن.',
+      emptyText: 'تظهر الدروس هنا بعد المراجعة والاعتماد وإصدار حزمة المنهج.',
+      learning: 'مسار التعلّم', objective: 'هدف الدرس',
+      reviewQueue: 'لا توجد مراجعات مستحقة في المعاينة.', previewOnly: 'معاينة فقط',
+      close: 'إغلاق', noMicrophone: 'لا يستخدم التطبيق الميكروفون ولا يقيّم صوت المتعلم.'
+    };
+    const en = {
+      brand: 'Fluently', subtitle: 'Your confident path to English',
+      greeting: 'Welcome to your journey', hero: 'Start from zero. Progress with confidence.',
+      heroText: 'Learn American English through a clear path, focused lessons, and thoughtful review.',
+      continue: 'Continue learning', path: 'Learning path', review: 'Daily review',
+      library: 'Lesson library', home: 'Home', goals: 'Today’s goal', minutes: '10 minutes',
+      stages: 'Your learning journey', seeAll: 'View path', progress: 'Your progress', lessons: 'Lessons started',
+      streak: 'Learning consistency', days: 'days', mastery: 'Mastery matters more than speed',
+      draft: 'Draft for human review', offline: 'Local learning',
+      offlineText: 'Progress is saved on this device.', storage: 'Browser storage',
+      persistent: 'Persistent storage requested', notPersistent: 'The browser may evict data when space is low',
+      back: 'Back', next: 'Next', finish: 'Finish lesson', correct: 'Correct answer',
+      incorrect: 'Review the explanation and try again', answer: 'Check answer',
+      step: 'Step', of: 'of', settings: 'Settings', language: 'Interface language',
+      dark: 'Dark mode', light: 'Light mode', demo: 'Development preview — visible content consists of unpublished learning drafts.',
+      loginTitle: 'Start your Fluently journey', loginText: 'Full access requires a first sign-in and then a curriculum package download.',
+      authPending: 'Sign-in setup awaits manual approval',
+      authText: 'No identity or email provider is enabled until card, billing, and free-tier requirements are verified.',
+      admin: 'Admin is a separate application', noContent: 'There are no published lessons yet.',
+      emptyText: 'Lessons appear here after human review, approval, and curriculum package release.',
+      learning: 'Learning path', objective: 'Lesson objective',
+      reviewQueue: 'No reviews are due in this preview.', previewOnly: 'Preview only',
+      close: 'Close', noMicrophone: 'The app does not request microphone access or score learner speech.'
+    };
+    return locale === 'ar' ? ar : en;
+  }, [locale]);
+
+  const lessons = DEMO_ENABLED ? draftLessons : [];
+  const currentStep = activeLesson?.steps[stepIndex];
+
+  async function openLesson(lesson: Lesson) {
+    setActiveLesson(lesson);
+    setStepIndex(0);
+    setCompleted([]);
+    setScreen('lesson');
+    const saved = await readLessonProgress(lesson.id).catch(() => undefined);
+    if (saved) setCompleted(saved.completedStepIds);
+  }
+
+  async function recordStep(stepId: string) {
+    if (!activeLesson) return;
+    const next = Array.from(new Set([...completed, stepId]));
+    setCompleted(next);
+    await saveLessonProgress({
+      lessonId: activeLesson.id,
+      completedStepIds: next,
+      updatedAt: new Date().toISOString(),
+      contentVersion: activeLesson.contentVersion
+    });
+    setProgressCount((value) => Math.max(value, 1));
+  }
+
+  async function advanceStep() {
+    if (!activeLesson || !currentStep) return;
+    await recordStep(currentStep.id);
+    if (stepIndex >= activeLesson.steps.length - 1) {
+      setActiveLesson(null);
+      setScreen('home');
+      return;
+    }
+    setStepIndex((value) => value + 1);
+  }
+
+  if (!signedIn) {
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <div className="brand-mark"><GraduationCap size={28} /></div>
+          <span className="eyebrow">FLUENTLY</span>
+          <h1>{t.loginTitle}</h1>
+          <p>{t.loginText}</p>
+          <div className="auth-warning"><ShieldCheck size={20} /><div><strong>{t.authPending}</strong><span>{t.authText}</span></div></div>
+          <button className="button button-primary" disabled>{t.previewOnly}</button>
+          <small>{t.admin}: <a href="/admin/">/admin</a></small>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setScreen('home'); }}>
+          <span className="brand-mark"><GraduationCap size={25} /></span>
+          <span><strong>{t.brand}</strong><small>{t.subtitle}</small></span>
+        </a>
+        <nav className="side-nav" aria-label="Main navigation">
+          <button className={screen === 'home' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('home')}><Home size={18} />{t.home}</button>
+          <button className={screen === 'path' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('path')}><Layers3 size={18} />{t.path}</button>
+          <button className={screen === 'review' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('review')}><Clock3 size={18} />{t.review}<span className="nav-count">0</span></button>
+          <button className={screen === 'settings' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('settings')}><Settings2 size={18} />{t.settings}</button>
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="offline-card"><CloudOff size={17} /><div><strong>{t.offline}</strong><span>{t.offlineText}</span></div></div>
+          <div className="sidebar-user"><div className="avatar">F</div><div><strong>Fluently</strong><small>{t.previewOnly}</small></div><button aria-label={t.settings} onClick={() => setScreen('settings')}><Settings2 size={17} /></button></div>
+        </div>
+      </aside>
+
+      <main className="main-content">
+        <header className="topbar">
+          <div><span className="breadcrumb">{screen === 'home' ? t.home : screen === 'path' ? t.path : screen === 'review' ? t.review : screen === 'settings' ? t.settings : t.library}</span></div>
+          <div className="topbar-actions">
+            <button className="icon-button" onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')} title={t.language}>{locale === 'ar' ? 'EN' : 'عربي'}</button>
+            <button className="icon-button" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} title={theme === 'light' ? t.dark : t.light}>{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>
+            <div className="avatar avatar-small">F</div>
+          </div>
+        </header>
+
+        {DEMO_ENABLED && demoNotice && <div className="demo-banner"><Sparkles size={17} /><span>{t.demo}</span><button aria-label={t.close} onClick={() => setDemoNotice(false)}><X size={17} /></button></div>}
+
+        {screen === 'home' && (
+          <>
+            <section className="welcome-row">
+              <div><span className="eyebrow">{t.greeting}</span><h1>{t.hero}</h1><p>{t.heroText}</p></div>
+              <div className="welcome-art"><div className="art-circle"><BookOpen size={45} /></div><span className="art-star star-one">✦</span><span className="art-star star-two">✧</span></div>
+            </section>
+            <section className="goal-grid">
+              <article className="goal-card goal-main"><div className="goal-icon"><Target size={20} /></div><div><span>{t.goals}</span><strong>{t.minutes}</strong><small>{t.mastery}</small></div><div className="goal-ring"><span>0/10</span></div></article>
+              <article className="stat-card"><div className="stat-icon green"><BookOpen size={19} /></div><span>{t.progress}</span><strong>{progressCount}</strong><small>{t.lessons}</small></article>
+              <article className="stat-card"><div className="stat-icon amber"><Flame size={19} /></div><span>{t.streak}</span><strong>0 <small>{t.days}</small></strong><small>{t.mastery}</small></article>
+            </section>
+            <section className="section-block">
+              <div className="section-heading"><div><span className="eyebrow">{t.learning}</span><h2>{t.stages}</h2></div><button className="text-button" onClick={() => setScreen('path')}>{t.seeAll}<ChevronLeft size={17} /></button></div>
+              <div className="stage-strip">{curriculumStages.slice(0, 4).map((stage, index) => <div className={index === 0 ? 'stage-card stage-current' : 'stage-card'} key={stage.id}><span className="stage-number">{index + 1}</span><strong>{stage.title}</strong><small>{stage.description}</small><div className="stage-line"><span style={{ width: index === 0 ? '12%' : '0%' }} /></div></div>)}</div>
+            </section>
+            <section className="section-block">
+              <div className="section-heading"><div><span className="eyebrow">{t.library}</span><h2>{t.continue}</h2></div><button className="text-button" onClick={() => setScreen('path')}>{t.seeAll}<ChevronLeft size={17} /></button></div>
+              {lessons.length ? <LessonList lessons={lessons} openLesson={openLesson} t={t} /> : <EmptyState title={t.noContent} text={t.emptyText} />}
+            </section>
+          </>
+        )}
+
+        {screen === 'path' && (
+          <section className="page-section"><div className="page-intro"><span className="eyebrow">{t.learning}</span><h1>{t.path}</h1><p>{t.heroText}</p></div>
+            <div className="path-list">{curriculumStages.map((stage, index) => <article className="path-stage" key={stage.id}><div className="path-stage-number">{index + 1}</div><div className="path-stage-copy"><strong>{stage.title}</strong><p>{stage.description}</p>{DEMO_ENABLED && index === 0 && <LessonList lessons={draftLessons.filter((lesson) => lesson.stage === stage.id)} openLesson={openLesson} t={t} />}</div><span className="locked-label">{index === 0 ? t.previewOnly : '—'}</span></article>)}</div>
+          </section>
+        )}
+
+        {screen === 'review' && <section className="page-section"><div className="page-intro"><span className="eyebrow">{t.review}</span><h1>{t.review}</h1><p>{t.reviewQueue}</p></div><EmptyState title={t.reviewQueue} text={t.emptyText} /></section>}
+
+        {screen === 'settings' && (
+          <section className="page-section"><div className="page-intro"><span className="eyebrow">{t.settings}</span><h1>{t.settings}</h1></div>
+            <div className="settings-list">
+              <div className="setting-row"><div><strong>{t.language}</strong><small>{locale === 'ar' ? 'العربية' : 'English'}</small></div><button className="button button-secondary" onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}>{locale === 'ar' ? 'English' : 'العربية'}</button></div>
+              <div className="setting-row"><div><strong>{t.dark}</strong><small>{theme === 'light' ? t.light : t.dark}</small></div><button className="button button-secondary" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? t.dark : t.light}</button></div>
+              <div className="setting-row"><div><strong>تخزين المتصفح</strong><small>{isPersistent ? t.persistent : t.notPersistent}</small></div><span className="setting-check">{isPersistent ? <CheckCircle2 size={19} /> : <CircleHelp size={19} />}</span></div>
+              <div className="setting-row"><div><strong>{t.admin}</strong><small>/admin — separate build target</small></div><a className="button button-secondary" href="/admin/">Open</a></div>
+              <p className="privacy-note">{t.noMicrophone}</p>
+            </div>
+          </section>
+        )}
+
+        {screen === 'lesson' && activeLesson && currentStep && (
+          <section className="lesson-shell">
+            <div className="lesson-head"><button className="back-button" onClick={() => setScreen('path')}><ArrowRight size={17} />{t.back}</button><div><span className="eyebrow">{activeLesson.stage}</span><h1>{activeLesson.title}</h1></div><span className="lesson-duration"><Clock3 size={15} />{activeLesson.estimatedMinutes} min</span></div>
+            <div className="lesson-progress"><div><span style={{ width: (Math.round(((stepIndex + 1) / activeLesson.steps.length) * 100)) + '%' }} /></div><small>{t.step} {stepIndex + 1} {t.of} {activeLesson.steps.length}</small></div>
+            <div className="lesson-body">
+              <div className="lesson-step-card">
+                {currentStep.type === 'explanation' && <><span className="step-type"><BookOpen size={16} />{t.objective}</span><h2>{currentStep.heading}</h2><p className="lesson-explanation">{currentStep.body}</p></>}
+                {currentStep.type === 'example' && <><span className="step-type"><Volume2 size={16} />{t.objective}</span><div className="example-english">{currentStep.english}</div><p className="example-arabic">{currentStep.arabic}</p>{currentStep.note && <div className="note-box">{currentStep.note}</div>}</>}
+                {currentStep.type === 'choice' && <ChoiceActivity step={currentStep} onComplete={() => void recordStep(currentStep.id)} t={t} />}
+              </div>
+              {currentStep.type !== 'choice' && <button className="button button-primary next-button" onClick={() => void advanceStep()}>{stepIndex === activeLesson.steps.length - 1 ? t.finish : t.next}<ArrowLeft size={17} /></button>}
+              {currentStep.type === 'choice' && stepIndex < activeLesson.steps.length - 1 && <button className="button button-primary next-button" disabled={!completed.includes(currentStep.id)} onClick={() => setStepIndex((value) => value + 1)}>{t.next}<ArrowLeft size={17} /></button>}
+              {currentStep.type === 'choice' && stepIndex === activeLesson.steps.length - 1 && completed.includes(currentStep.id) && <button className="button button-primary next-button" onClick={() => { setActiveLesson(null); setScreen('home'); }}>{t.finish}<Check size={17} /></button>}
+            </div>
+          </section>
+        )}
+        <footer className="app-footer"><span>Fluently · {t.previewOnly}</span><span>{t.mastery}</span></footer>
+      </main>
+    </div>
+  );
+}
+
+function LessonList({ lessons, openLesson, t }: { lessons: Lesson[]; openLesson: (lesson: Lesson) => void; t: Record<string, string> }) {
+  return <div className="lesson-list">{lessons.map((lesson) => <article className="lesson-row" key={lesson.id}><div className="lesson-row-icon"><BookOpen size={19} /></div><div className="lesson-row-copy"><strong>{lesson.title}</strong><span>{lesson.description}</span><small>{lesson.estimatedMinutes} min · {t.draft}</small></div><button className="round-action" aria-label={t.next} onClick={() => openLesson(lesson)}><Play size={17} /></button></article>)}</div>;
+}
+
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return <div className="empty-state"><div><BookOpen size={23} /></div><strong>{title}</strong><p>{text}</p></div>;
+}
+
+function ChoiceActivity({ step, onComplete, t }: { step: Extract<Lesson['steps'][number], { type: 'choice' }>; onComplete: () => void; t: Record<string, string> }) {
+  const [selected, setSelected] = useState('');
+  const [feedback, setFeedback] = useState<{ correct: boolean; text: string } | null>(null);
+  function check() {
+    const question: ChoiceQuestion = {
+      id: step.questionId, objectiveId: 'preview.objective', prompt: step.prompt,
+      options: step.options, correctOptionId: step.answerId,
+      explanationCorrect: step.explanation, explanationIncorrect: 'هذه ليست الإجابة المطلوبة. ' + step.explanation
+    };
+    const result = gradeChoice(question, selected);
+    setFeedback({ correct: result.correct, text: result.feedback });
+    if (result.correct) onComplete();
+  }
+  return <div className="choice-activity"><span className="step-type"><CircleHelp size={16} />{t.objective}</span><h2>{step.prompt}</h2><div className="choice-options">{step.options.map((option) => <button key={option.id} className={selected === option.id ? 'choice-option selected' : 'choice-option'} onClick={() => { setSelected(option.id); setFeedback(null); }}><span className="choice-radio">{selected === option.id ? <Check size={14} /> : null}</span>{option.text}</button>)}</div><button className="button button-primary" disabled={!selected} onClick={check}>{t.answer}</button>{feedback && <div className={feedback.correct ? 'feedback correct' : 'feedback incorrect'}>{feedback.correct ? <CheckCircle2 size={18} /> : <CircleHelp size={18} />}{feedback.text}</div>}</div>;
+}
+
+export default App;
