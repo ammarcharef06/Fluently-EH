@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./sync": "./src/sync.ts",
+    "./curriculum": "./src/curriculum.ts"
   },
   "dependencies": {
     "@fluently/domain": "1.0.0",
+    "@fluently/content-schema": "1.0.0",
     "idb": "8.0.2"
   }
 }

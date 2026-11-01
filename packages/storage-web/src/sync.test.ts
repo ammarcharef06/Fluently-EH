@@ -28,7 +28,7 @@ describe('syncPendingOperations', () => {
     expect((await pendingOperations()).some((entry) => entry.operationId === item.operationId)).toBe(true);
   });
 
-  it('acknowledges only operation IDs confirmed by the same server response', async () => {
+  it('acknowledges only IDs confirmed by the same server response', async () => {
     const item = operation('00000000-0000-4000-8000-000000000002');
     await enqueueOperation(item);
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ accepted: [item.operationId], duplicates: [] }), {
@@ -37,14 +37,11 @@ describe('syncPendingOperations', () => {
     vi.stubGlobal('fetch', fetchMock);
     const result = await syncPendingOperations('/api/');
     expect(result).toEqual({ status: 'synced', acknowledged: 1 });
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sync/push', expect.objectContaining({
-      method: 'POST',
-      credentials: 'include'
-    }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/sync/push', expect.objectContaining({ method: 'POST', credentials: 'include' }));
     expect((await pendingOperations()).some((entry) => entry.operationId === item.operationId)).toBe(false);
   });
 
-  it('rejects a server response that attempts to acknowledge an unknown operation', async () => {
+  it('rejects unknown IDs in an acknowledgement', async () => {
     const item = operation('00000000-0000-4000-8000-000000000003');
     await enqueueOperation(item);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ accepted: ['00000000-0000-4000-8000-000000000099'], duplicates: [] }), {
@@ -53,5 +50,14 @@ describe('syncPendingOperations', () => {
     const result = await syncPendingOperations();
     expect(result.status).toBe('invalid_response');
     expect((await pendingOperations()).some((entry) => entry.operationId === item.operationId)).toBe(true);
+  });
+
+  it('clears local learning data when the server confirms account deletion', async () => {
+    const item = operation('00000000-0000-4000-8000-000000000004');
+    await enqueueOperation(item);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'account_deletion_pending' }), { status: 410 })));
+    const result = await syncPendingOperations();
+    expect(result.status).toBe('account_deletion_pending');
+    expect(await pendingOperations()).toEqual([]);
   });
 });
