@@ -558,15 +558,20 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     let sql;
     try { sql = getDatabase(env); } catch { return json({ error: 'database_not_configured' }, 503); }
     try {
-      const existing = await sql.unsafe(
-        "select id from curriculum_releases where package_id='fluently.core' and content_version=$1",
-        [parsed.data.contentVersion]
-      );
-      if (existing.length) return json({ error: 'release_version_exists' }, 409);
-      const rows = await sql.unsafe(
-        "select id,content_json,source_metadata,created_by::text as created_by,reviewed_by::text as reviewed_by " +
-        "from content_items where status in ('approved','published') order by id"
-      );
+      const snapshot = await sql.begin(async (tx) => {
+        await tx.unsafe("select set_config('app.user_id', $1, true)", [user.userId]);
+        const existing = await tx.unsafe(
+          "select id from curriculum_releases where package_id='fluently.core' and content_version=$1",
+          [parsed.data.contentVersion]
+        );
+        const rows = await tx.unsafe(
+          "select id,content_json,source_metadata,created_by::text as created_by,reviewed_by::text as reviewed_by " +
+          "from content_items where status in ('approved','published') order by id"
+        );
+        return { releaseExists: existing.length > 0, rows };
+      });
+      if (snapshot.releaseExists) return json({ error: 'release_version_exists' }, 409);
+      const rows = snapshot.rows;
       const lessons = rows.map((row) => row.content_json);
       if (!lessons.length || !lessons.every(isApprovedLesson)) return json({ error: 'no_human_approved_content' }, 409);
       if (rows.some((row) => !row.reviewed_by || row.reviewed_by === row.created_by || row.reviewed_by === user.userId)) {
