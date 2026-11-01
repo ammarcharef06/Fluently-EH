@@ -205,6 +205,66 @@ function App() {
     setProgressCount((value) => Math.max(value, 1));
   }
 
+  async function recordChoiceAttempt(questionId: string, correct: boolean, stepId: string) {
+    if (!activeLesson) return;
+    const occurredAtLocal = new Date().toISOString();
+    const objectiveId = activeLesson.objectives[0]?.id ?? questionId;
+    const skill = activeLesson.skills[0] ?? 'reading';
+    const attempt = createSyncOperation({
+      entityId: questionId,
+      entityType: 'lesson_attempt',
+      occurredAtLocal,
+      payload: {
+        contentVersion: activeLesson.contentVersion,
+        questionId,
+        objectiveId,
+        contextId: activeLesson.id + ':' + stepId,
+        skill,
+        correct
+      }
+    });
+    await enqueueOperation(attempt);
+
+    const previous = (await listReviewStates()).find((item) => item.itemId === questionId) ?? null;
+    const nextReview: ReviewState = {
+      ...scheduleReview(previous, correct ? 5 : 2, new Date(occurredAtLocal)),
+      itemId: questionId
+    };
+    await saveReviewState(nextReview);
+    const reviewOperation = createSyncOperation({
+      entityId: questionId,
+      entityType: 'review_event',
+      occurredAtLocal,
+      payload: {
+        contentVersion: activeLesson.contentVersion,
+        questionId,
+        reviewState: nextReview
+      }
+    });
+    await enqueueOperation(reviewOperation);
+    setDueReviews(selectDueReviews(await listReviewStates()));
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      const result = await syncPendingOperations('/api');
+      setSyncStatus(result.status);
+    }
+  }
+
+  async function syncNow() {
+    const result = await syncPendingOperations('/api');
+    setSyncStatus(result.status);
+    setDueReviews(selectDueReviews(await listReviewStates().catch(() => [])));
+  }
+
+  async function startDueReview(itemId: string) {
+    const source = lessons.find((lesson) =>
+      lesson.steps.some((step) => step.type === 'choice' && step.questionId === itemId)
+    );
+    if (!source) return;
+    await openLesson(source);
+    const index = source.steps.findIndex((step) => step.type === 'choice' && step.questionId === itemId);
+    setStepIndex(Math.max(0, index));
+  }
+
   async function advanceStep() {
     if (!activeLesson || !currentStep) return;
     await recordStep(currentStep.id);
