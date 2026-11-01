@@ -16,3 +16,5 @@ drop table if exists app_users;
 drop type if exists employee_role;
 drop type if exists content_status;
 drop type if exists account_status;
+
+drop function if exists fluently_current_user_id();

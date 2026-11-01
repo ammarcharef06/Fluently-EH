@@ -1,10 +1,11 @@
-import { acknowledgeOperations, pendingOperations } from './index';
+import { acknowledgeOperations, clearLocalLearningData, pendingOperations } from './index';
 
 export type SyncOutcome =
   | { status: 'empty'; acknowledged: 0 }
   | { status: 'offline'; acknowledged: 0 }
   | { status: 'authentication_required'; acknowledged: 0 }
   | { status: 'email_verification_required'; acknowledged: 0 }
+  | { status: 'account_deletion_pending'; acknowledged: 0 }
   | { status: 'service_unavailable'; acknowledged: 0 }
   | { status: 'invalid_response'; acknowledged: 0 }
   | { status: 'network_error'; acknowledged: 0 }
@@ -30,6 +31,10 @@ export async function syncPendingOperations(apiBase = '/api'): Promise<SyncOutco
 
     if (response.status === 401) return { status: 'authentication_required', acknowledged: 0 };
     if (response.status === 403) return { status: 'email_verification_required', acknowledged: 0 };
+    if (response.status === 410) {
+      await clearLocalLearningData();
+      return { status: 'account_deletion_pending', acknowledged: 0 };
+    }
     if (response.status === 503 || !response.ok) return { status: 'service_unavailable', acknowledged: 0 };
 
     const payload = await response.json() as SyncResponse;
