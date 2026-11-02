@@ -94,6 +94,14 @@ describe('curriculum manifest preflight', () => {
       { path: 'c.bin', bytes: 50 * 1024 * 1024 + 1 }
     ])).ok).toBe(false);
   });
+
+  it('rejects manifests that exceed the declared file-count limit', () => {
+    const files = Array.from({ length: 5001 }, (_, index) => ({
+      path: 'lesson-' + index + '.md',
+      bytes: 0
+    }));
+    expect(validateCurriculumManifest(manifestFor(files)).ok).toBe(false);
+  });
 });
 
 describe('package integrity', () => {
