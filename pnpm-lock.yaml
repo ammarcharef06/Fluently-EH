@@ -257,6 +257,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fluently/assessment-engine':
+        specifier: workspace:*
+        version: link:../../packages/assessment-engine
       '@fluently/content-schema':
         specifier: workspace:*
         version: link:../../packages/content-schema
