@@ -75,6 +75,20 @@ describe('mastery evaluation', () => {
     expect(result.mastered).toBe(false);
   });
 
+  it('uses the latest response for each question and its context as evidence', () => {
+    const result = evaluateMastery([
+      makeAttempt('q1', 'old-context', true),
+      makeAttempt('q1', 'latest-context', false),
+      makeAttempt('q2', 'another-context', true)
+    ], masteryRule);
+
+    expect(result.distinctQuestions).toBe(2);
+    expect(result.distinctContexts).toBe(2);
+    expect(result.successfulAttempts).toBe(1);
+    expect(result.correctRate).toBe(0.5);
+    expect(result.mastered).toBe(false);
+  });
+
   it('rejects invalid mastery configuration instead of applying hidden defaults', () => {
     expect(() => evaluateMastery([], {
       ...masteryRule,
@@ -168,7 +182,7 @@ describe('grading and feedback', () => {
     expect(result.correct).toBe(false);
   });
 
-  it('does not collapse internal whitespace unless the policy enables it', () => {
+  it('collapses internal whitespace only when the policy enables it', () => {
     const result = gradeTextAnswer({
       ...textQuestion,
       acceptedAnswers: ['good morning']
@@ -177,7 +191,7 @@ describe('grading and feedback', () => {
       trimWhitespace: true,
       collapseWhitespace: true
     });
-    expect(result.correct).toBe(false);
+    expect(result.correct).toBe(true);
   });
 
   it('builds feedback without inventing an example or remedial target', () => {
@@ -266,6 +280,27 @@ describe('placement calibration', () => {
     if (result.status === 'calibration_required') {
       expect(result.missingSkills).toContain('grammar');
     }
+  });
+
+  it('rejects a calibration evidence requirement greater than the blueprint item count', () => {
+    const invalidBlueprint: PlacementBlueprint = {
+      ...calibratedBlueprint,
+      calibration: {
+        ...calibratedBlueprint.calibration!,
+        minimumResponsesBySkill: { reading: 3, grammar: 2 }
+      }
+    };
+    expect(evaluatePlacement(invalidBlueprint, placementResponses).status).toBe('calibration_required');
+  });
+
+  it('does not apply a built-in evidence minimum to an empty blueprint', () => {
+    const emptyBlueprint: PlacementBlueprint = {
+      version: 'empty-placement',
+      status: 'draft',
+      items: [],
+      calibration: null
+    };
+    expect(evaluatePlacement(emptyBlueprint, []).status).toBe('calibration_required');
   });
 
   it('returns insufficient evidence when the configured response count is not met', () => {
