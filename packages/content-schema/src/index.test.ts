@@ -44,6 +44,16 @@ describe('package paths', () => {
     expect(isSafePackagePath('lesson\\\\content.json')).toBe(false);
     expect(isSafePackagePath('lesson/\\u0000secret.txt')).toBe(false);
   });
+
+  it('blocks Windows device names, alternate data streams, and non-portable characters', () => {
+    expect(isSafePackagePath('CON.txt')).toBe(false);
+    expect(isSafePackagePath('folder/NUL')).toBe(false);
+    expect(isSafePackagePath('COM1.log')).toBe(false);
+    expect(isSafePackagePath('lesson:payload.txt')).toBe(false);
+    expect(isSafePackagePath('lesson?.md')).toBe(false);
+    expect(isSafePackagePath('lesson.md.')).toBe(false);
+    expect(isSafePackagePath('lesson.md ')).toBe(false);
+  });
 });
 
 describe('curriculum manifest preflight', () => {
