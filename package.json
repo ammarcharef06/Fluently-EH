@@ -3,13 +3,6 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "workspaces": [
-    "apps/web",
-    "apps/admin",
-    "apps/android",
-    "packages/*",
-    "services/api"
-  ],
   "scripts": {
     "dev": "node scripts/dev-stack.mjs",
     "dev:admin": "pnpm --filter @fluently/admin dev",
@@ -46,12 +39,5 @@
     "@testing-library/jest-dom": "6.6.3",
     "fake-indexeddb": "6.0.0"
   },
-  "packageManager": "pnpm@12.16.1",
-  "pnpm": {
-    "overrides": {
-      "glob": "14.0.2",
-      "minimatch": "11.0.1",
-      "zod": "4.6.7"
-    }
-  }
+  "packageManager": "pnpm@12.16.1"
 }
