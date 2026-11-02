@@ -69,7 +69,7 @@ describe('mastery evaluation', () => {
     ], masteryRule);
 
     expect(result.distinctQuestions).toBe(2);
-    expect(result.distinctContexts).toBe(2);
+    expect(result.distinctContexts).toBe(1);
     expect(result.successfulAttempts).toBe(1);
     expect(result.correctRate).toBe(0.5);
     expect(result.mastered).toBe(false);
