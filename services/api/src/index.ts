@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { LessonSchema, validateCurriculumManifest } from '@fluently/content-schema';
+import { LessonSchema, MAX_PACKAGE_BYTES, validateCurriculumManifest } from '@fluently/content-schema';
+import { buildCurriculumArchive } from './curriculum-package';
 import { decodeCurriculumFilePath } from './curriculum-files';
 import { authenticateRequest, hasRole } from './auth';
 import { getDatabase } from './db';
@@ -176,6 +177,46 @@ async function getReleaseObject(env: Env, request: Request, key: 'manifest.json'
   }
 }
 
+async function getReleaseArchive(env: Env): Promise<Response> {
+  if (!env.CURRICULUM_BUCKET) return json({ error: 'curriculum_storage_not_configured' }, 503);
+  let sql;
+  try {
+    sql = getDatabase(env);
+  } catch {
+    return json({ error: 'database_not_configured' }, 503);
+  }
+
+  try {
+    const releases = await sql.unsafe(
+      "select id from curriculum_releases where package_id='fluently.core' and status='published' order by published_at desc limit 1"
+    );
+    const release = releases[0] as { id: string } | undefined;
+    if (!release) return json({ error: 'no_published_curriculum' }, 404);
+    const object = await env.CURRICULUM_BUCKET.get('published/' + release.id + '/curriculum.zip');
+    if (!object) return json({ error: 'published_curriculum_archive_missing' }, 503);
+    if (object.size > MAX_PACKAGE_BYTES + 2 * 1024 * 1024) {
+      return json({ error: 'published_curriculum_archive_too_large' }, 503);
+    }
+
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Length': String(object.size),
+        'Content-Disposition': 'attachment; filename="curriculum.zip"',
+        'Cache-Control': 'private, max-age=60',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'same-origin',
+        ETag: object.httpEtag,
+        Vary: 'Cookie, Authorization'
+      }
+    });
+  } catch {
+    return json({ error: 'curriculum_archive_query_failed' }, 503);
+  } finally {
+    await sql.end({ timeout: 1 });
+  }
+}
+
 async function getReleaseFile(env: Env, filePath: string): Promise<Response> {
   if (!env.CURRICULUM_BUCKET) return json({ error: 'curriculum_storage_not_configured' }, 503);
 
@@ -266,6 +307,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   const exportMatch = path === '/v1/me/export';
   const curriculumManifest = path === '/v1/curriculum/manifest';
   const curriculumContent = path === '/v1/curriculum/content.json';
+  const curriculumZip = path === '/v1/curriculum/package.zip';
   const curriculumFilesPrefix = '/v1/curriculum/files/';
   const curriculumFileRequest = path.startsWith(curriculumFilesPrefix);
   const syncPush = path === '/v1/sync/push';
@@ -400,6 +442,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   }
 
   if (curriculumManifest && method === 'GET') return getReleaseObject(env, request, 'manifest.json');
+  if (curriculumZip && method === 'GET') return getReleaseArchive(env);
   if (curriculumContent && method === 'GET') return getReleaseFile(env, 'content.json');
   if (curriculumFileRequest && method === 'GET') {
     const filePath = decodeCurriculumFilePath(path.slice(curriculumFilesPrefix.length));
