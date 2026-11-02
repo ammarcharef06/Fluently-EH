@@ -43,7 +43,7 @@
 | Test ID | البيئة / الإصدار | النتيجة | الدليل | التاريخ | ملاحظات |
 |---|---|---|---|---|---|
 | H2a-APK | GitHub Actions `ubuntu-24.04`؛ Emulator 37.2.13.0 | **جزئي** — build/payload pass؛ emulator failed on `/dev/kvm` permission after two launches; install/runtime checksum not run | [Run 41352126795](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41352126795)؛ commit `1bb3349b36e33d4f57e8305063639f8c868840c0`؛ APK 138,378,150 bytes؛ Gradle 86.644s | 2026-11-01 | artifacts 30 يومًا؛ لا إثبات runtime read/hash؛ لا كود H4 حتى مراجعة المستخدم |
-| H2b-EXE | لم ينفذ؛ مؤجل بقرار | مؤجل — غير مُثبت | — | قبل قرار إطلاق Windows | الشروط الثلاثة في ملف H2b: runner/toolchain، مسار build/runtime/tamper، وشهادة Authenticode موثوقة |
+| H2b-EXE | لم ينفذ حتى 2026-11-02 | مفتوح للتنفيذ بقرار E-14 — غير مُثبت | — | مسار Web/Windows الأول | Windows runner/toolchain؛ build/install/runtime-read/tamper. Authenticode بوابة توزيع منفصلة؛ لا شراء شهادة أو خدمة ضمن التفويض | مفتوح — لم يبدأ Tauri/EXE |
 | H4-ANDROID | لم ينفذ بعد H2a | مخطط — Android فقط | — | بعد H2a وقبل 2026-11-05 إن سمح الوقت | حالة سليمة MATCH/ACCEPTED وحالة معدّلة MISMATCH/REJECTED؛ يعاد بناء وتوقيع APK لكل حالة |
 
 **قاعدة التحديث:** بعد كل تجربة، حدّث صف المتطلب وسجل نتيجة الاختبار في هذا الملف ضمن PR نفسه الذي يغير القرار أو التنفيذ ذي الصلة. لا تضع "اجتاز" دون سجل دليل قابل لإعادة الفحص.
