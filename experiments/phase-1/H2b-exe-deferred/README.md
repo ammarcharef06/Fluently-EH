@@ -31,7 +31,7 @@
 
 ## خطوة H2b-1 — فحص بيئة Windows
 
-أُضيف سير عمل `.github/workflows/h2b-windows-environment.yml` على `windows-2025` ليتحقق من Node.js `22.16.0` وRust `1.99.1` وهدف MSVC x64، ووجود Visual Studio C++ Build Tools وWebView2 Evergreen Runtime. يحفظ التقرير كـ artifact لمدة 30 يومًا.
+أُضيف سير عمل `.github/workflows/ci.yml` على `windows-2025` ليتحقق من Node.js `22.16.0` وRust `1.99.1` وهدف MSVC x64، ووجود Visual Studio C++ Build Tools وWebView2 Evergreen Runtime. يحفظ التقرير كـ artifact لمدة 30 يومًا.
 
 هذه الخطوة **فحص بيئة فقط**؛ لا تبني Tauri ولا EXE ولا تثبت التطبيق ولا تختبر قراءة payload أو tamper. تظل H2b «غير مُثبت» حتى اجتياز جميع شروطها الوظيفية على Windows.
 
