@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  DEFAULT_LOCALE, getDirection, messages, resolveLocale, t as translate,
+  type Locale, type TranslationKey
+} from '@fluently/i18n';
+import {
   ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, ChevronLeft, CircleHelp,
   Clock3, CloudOff, Flame, GraduationCap, Home, Layers3, Moon, Play,
   Settings2, ShieldCheck, Sparkles, Sun, Target, Volume2, X
@@ -16,7 +20,6 @@ import { downloadAndActivateCurriculum, readActiveCurriculumPackage } from '@flu
 import { syncPendingOperations } from '@fluently/storage-web/sync';
 
 type Screen = 'home' | 'path' | 'lesson' | 'review' | 'settings';
-type Locale = 'ar' | 'en';
 const DEMO_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO !== 'false';
 
 function App() {
@@ -29,16 +32,37 @@ function App() {
   const [serverLessons, setServerLessons] = useState<Lesson[]>([]);
   const [dueReviews, setDueReviews] = useState<ReviewState[]>([]);
   const [syncStatus, setSyncStatus] = useState('idle');
-  const [locale, setLocale] = useState<Locale>('ar');
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+  const [localeReady, setLocaleReady] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [demoNotice, setDemoNotice] = useState(true);
   const [isPersistent, setIsPersistent] = useState<boolean | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    void readSetting('interfaceLocale')
+      .then((savedLocale) => {
+        if (!cancelled && typeof savedLocale === 'string') {
+          setLocale(resolveLocale(savedLocale));
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLocaleReady(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.lang = locale;
-    document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.dir = getDirection(locale);
     document.documentElement.dataset.theme = theme;
   }, [locale, theme]);
+
+  useEffect(() => {
+    if (!localeReady) return;
+    void saveSetting('interfaceLocale', locale).catch(() => undefined);
+  }, [locale, localeReady]);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -74,57 +98,15 @@ function App() {
     };
   }, [signedIn]);
 
-  const t = useMemo(() => {
-    const ar = {
-      brand: 'Fluently', subtitle: 'خطوتك الواثقة نحو الإنجليزية',
-      greeting: 'أهلًا بك في رحلتك', hero: 'ابدأ من الصفر، وتقدّم بثبات.',
-      heroText: 'تعلّم الإنجليزية الأمريكية بخطة واضحة، ودروس قصيرة، ومراجعة متدرجة.',
-      continue: 'تابع التعلّم', path: 'المسار التعليمي', review: 'المراجعة اليومية',
-      library: 'مكتبة الدروس', home: 'الرئيسية', goals: 'هدف اليوم', minutes: '10 دقائق',
-      stages: 'مراحل رحلتك', seeAll: 'عرض المسار', progress: 'تقدّمك', lessons: 'دروس بدأت',
-      streak: 'استمرارية التعلّم', days: 'يوم', mastery: 'الإتقان أهم من السرعة',
-      draft: 'مسودة للمراجعة البشرية', offline: 'التعلّم المحلي',
-      offlineText: 'يحفظ التقدم على هذا الجهاز.', storage: 'تخزين المتصفح',
-      persistent: 'طلبنا الاحتفاظ الدائم بالتخزين', notPersistent: 'قد يزيل المتصفح البيانات عند ضيق المساحة',
-      back: 'رجوع', next: 'التالي', finish: 'إنهاء الدرس', correct: 'إجابة صحيحة',
-      incorrect: 'راجع الشرح ثم حاول مجددًا', answer: 'تحقق من الإجابة',
-      step: 'الخطوة', of: 'من', settings: 'الإعدادات', language: 'لغة الواجهة',
-      dark: 'الوضع الداكن', light: 'الوضع الفاتح', demo: 'وضع معاينة تطويري — المحتوى الظاهر مسودات تعليمية غير منشورة.',
-      loginTitle: 'ابدأ رحلتك مع Fluently', loginText: 'يتطلب الاستخدام الكامل تسجيل دخول أول مرة ثم تنزيل حزمة المنهج.',
-      authPending: 'إعداد تسجيل الدخول قيد الاعتماد اليدوي',
-      authText: 'لم نفعّل مزود هوية أو بريد قبل التحقق من شروط البطاقة والفوترة والمجانية.',
-      admin: 'لوحة الإدارة مستقلة', noContent: 'لا توجد دروس منشورة حتى الآن.',
-      emptyText: 'تظهر الدروس هنا بعد المراجعة والاعتماد وإصدار حزمة المنهج.',
-      learning: 'مسار التعلّم', objective: 'هدف الدرس',
-      reviewQueue: 'لا توجد مراجعات مستحقة في المعاينة.', previewOnly: 'معاينة فقط',
-      close: 'إغلاق', noMicrophone: 'لا يستخدم التطبيق الميكروفون ولا يقيّم صوت المتعلم.'
-    };
-    const en = {
-      brand: 'Fluently', subtitle: 'Your confident path to English',
-      greeting: 'Welcome to your journey', hero: 'Start from zero. Progress with confidence.',
-      heroText: 'Learn American English through a clear path, focused lessons, and thoughtful review.',
-      continue: 'Continue learning', path: 'Learning path', review: 'Daily review',
-      library: 'Lesson library', home: 'Home', goals: 'Today’s goal', minutes: '10 minutes',
-      stages: 'Your learning journey', seeAll: 'View path', progress: 'Your progress', lessons: 'Lessons started',
-      streak: 'Learning consistency', days: 'days', mastery: 'Mastery matters more than speed',
-      draft: 'Draft for human review', offline: 'Local learning',
-      offlineText: 'Progress is saved on this device.', storage: 'Browser storage',
-      persistent: 'Persistent storage requested', notPersistent: 'The browser may evict data when space is low',
-      back: 'Back', next: 'Next', finish: 'Finish lesson', correct: 'Correct answer',
-      incorrect: 'Review the explanation and try again', answer: 'Check answer',
-      step: 'Step', of: 'of', settings: 'Settings', language: 'Interface language',
-      dark: 'Dark mode', light: 'Light mode', demo: 'Development preview — visible content consists of unpublished learning drafts.',
-      loginTitle: 'Start your Fluently journey', loginText: 'Full access requires a first sign-in and then a curriculum package download.',
-      authPending: 'Sign-in setup awaits manual approval',
-      authText: 'No identity or email provider is enabled until card, billing, and free-tier requirements are verified.',
-      admin: 'Admin is a separate application', noContent: 'There are no published lessons yet.',
-      emptyText: 'Lessons appear here after human review, approval, and curriculum package release.',
-      learning: 'Learning path', objective: 'Lesson objective',
-      reviewQueue: 'No reviews are due in this preview.', previewOnly: 'Preview only',
-      close: 'Close', noMicrophone: 'The app does not request microphone access or score learner speech.'
-    };
-    return locale === 'ar' ? ar : en;
-  }, [locale]);
+  const t = useMemo(
+    () => Object.fromEntries(
+      Object.keys(messages[locale]).map((key) => [
+        key,
+        translate(key as TranslationKey, locale)
+      ])
+    ) as Record<TranslationKey, string>,
+    [locale]
+  );
 
   useEffect(() => {
     if (DEMO_ENABLED) return;
@@ -299,7 +281,7 @@ function App() {
           <span className="brand-mark"><GraduationCap size={25} /></span>
           <span><strong>{t.brand}</strong><small>{t.subtitle}</small></span>
         </a>
-        <nav className="side-nav" aria-label="Main navigation">
+        <nav className="side-nav" aria-label={t.mainNavigation}>
           <button className={screen === 'home' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('home')}><Home size={18} />{t.home}</button>
           <button className={screen === 'path' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('path')}><Layers3 size={18} />{t.path}</button>
           <button className={screen === 'review' ? 'nav-item active' : 'nav-item'} onClick={() => setScreen('review')}><Clock3 size={18} />{t.review}<span className="nav-count">{dueReviews.length}</span></button>
@@ -353,14 +335,14 @@ function App() {
 
         {screen === 'review' && (
           <section className="page-section">
-            <div className="page-intro"><span className="eyebrow">{t.review}</span><h1>{t.review}</h1><p>{dueReviews.length ? 'لديك عناصر حان موعد مراجعتها.' : t.reviewQueue}</p></div>
+            <div className="page-intro"><span className="eyebrow">{t.review}</span><h1>{t.review}</h1><p>{dueReviews.length ? translate('dueReviewsAvailable', locale, { count: dueReviews.length }) : t.reviewQueue}</p></div>
             {dueReviews.length === 0
               ? <EmptyState title={t.reviewQueue} text={t.emptyText} />
               : <div className="lesson-list">{dueReviews.map((item) => (
                 <article className="lesson-row" key={item.itemId}>
                   <div className="lesson-row-icon"><Clock3 size={19} /></div>
-                  <div className="lesson-row-copy"><strong>{item.itemId}</strong><span>المراجعة المتباعدة · {item.intervalDays} يوم</span><small>{item.version}</small></div>
-                  <button className="button button-secondary" onClick={() => void startDueReview(item.itemId)}>ابدأ المراجعة</button>
+                  <div className="lesson-row-copy"><strong>{item.itemId}</strong><span>{translate('spacedReviewInterval', locale, { days: item.intervalDays })}</span><small>{item.version}</small></div>
+                  <button className="button button-secondary" onClick={() => void startDueReview(item.itemId)}>{t.startReview}</button>
                 </article>
               ))}</div>}
           </section>
@@ -369,11 +351,11 @@ function App() {
         {screen === 'settings' && (
           <section className="page-section"><div className="page-intro"><span className="eyebrow">{t.settings}</span><h1>{t.settings}</h1></div>
             <div className="settings-list">
-              <div className="setting-row"><div><strong>{t.language}</strong><small>{locale === 'ar' ? 'العربية' : 'English'}</small></div><button className="button button-secondary" onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}>{locale === 'ar' ? 'English' : 'العربية'}</button></div>
+              <div className="setting-row"><div><strong>{t.language}</strong><small>{locale === 'ar' ? t.arabicLanguage : t.englishLanguage}</small></div><button className="button button-secondary" onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}>{locale === 'ar' ? t.englishLanguage : t.arabicLanguage}</button></div>
               <div className="setting-row"><div><strong>{t.dark}</strong><small>{theme === 'light' ? t.light : t.dark}</small></div><button className="button button-secondary" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? t.dark : t.light}</button></div>
-              <div className="setting-row"><div><strong>تخزين المتصفح</strong><small>{isPersistent ? t.persistent : t.notPersistent}</small></div><span className="setting-check">{isPersistent ? <CheckCircle2 size={19} /> : <CircleHelp size={19} />}</span></div>
-              <div className="setting-row"><div><strong>حالة المزامنة</strong><small>{syncStatus}</small></div><button className="button button-secondary" onClick={() => void syncNow()}>مزامنة الآن</button></div>
-              <div className="setting-row"><div><strong>{t.admin}</strong><small>/admin — separate build target</small></div><a className="button button-secondary" href="/admin/">Open</a></div>
+              <div className="setting-row"><div><strong>{t.storage}</strong><small>{isPersistent ? t.persistent : t.notPersistent}</small></div><span className="setting-check">{isPersistent ? <CheckCircle2 size={19} /> : <CircleHelp size={19} />}</span></div>
+              <div className="setting-row"><div><strong>{t.syncStatus}</strong><small>{({ idle: t.syncIdle, empty: t.syncEmpty, offline: t.syncOffline, authentication_required: t.syncAuthenticationRequired, email_verification_required: t.syncEmailVerificationRequired, account_deletion_pending: t.syncAccountDeletionPending, service_unavailable: t.syncServiceUnavailable, invalid_response: t.syncInvalidResponse, network_error: t.syncNetworkError, synced: t.syncSynced } as Record<string, string>)[syncStatus] ?? syncStatus}</small></div><button className="button button-secondary" onClick={() => void syncNow()}>{t.syncNow}</button></div>
+              <div className="setting-row"><div><strong>{t.admin}</strong><small>/admin — {t.separateBuildTarget}</small></div><a className="button button-secondary" href="/admin/">{t.open}</a></div>
               <p className="privacy-note">{t.noMicrophone}</p>
             </div>
           </section>
@@ -381,7 +363,7 @@ function App() {
 
         {screen === 'lesson' && activeLesson && currentStep && (
           <section className="lesson-shell">
-            <div className="lesson-head"><button className="back-button" onClick={() => setScreen('path')}><ArrowRight size={17} />{t.back}</button><div><span className="eyebrow">{activeLesson.stage}</span><h1>{activeLesson.title}</h1></div><span className="lesson-duration"><Clock3 size={15} />{activeLesson.estimatedMinutes} min</span></div>
+            <div className="lesson-head"><button className="back-button" onClick={() => setScreen('path')}><ArrowRight size={17} />{t.back}</button><div><span className="eyebrow">{activeLesson.stage}</span><h1>{activeLesson.title}</h1></div><span className="lesson-duration"><Clock3 size={15} />{activeLesson.estimatedMinutes} {t.minutesShort}</span></div>
             <div className="lesson-progress"><div><span style={{ width: (Math.round(((stepIndex + 1) / activeLesson.steps.length) * 100)) + '%' }} /></div><small>{t.step} {stepIndex + 1} {t.of} {activeLesson.steps.length}</small></div>
             <div className="lesson-body">
               <div className="lesson-step-card">
@@ -402,7 +384,7 @@ function App() {
 }
 
 function LessonList({ lessons, openLesson, t }: { lessons: Lesson[]; openLesson: (lesson: Lesson) => void; t: Record<string, string> }) {
-  return <div className="lesson-list">{lessons.map((lesson) => <article className="lesson-row" key={lesson.id}><div className="lesson-row-icon"><BookOpen size={19} /></div><div className="lesson-row-copy"><strong>{lesson.title}</strong><span>{lesson.description}</span><small>{lesson.estimatedMinutes} min · {t.draft}</small></div><button className="round-action" aria-label={t.next} onClick={() => openLesson(lesson)}><Play size={17} /></button></article>)}</div>;
+  return <div className="lesson-list">{lessons.map((lesson) => <article className="lesson-row" key={lesson.id}><div className="lesson-row-icon"><BookOpen size={19} /></div><div className="lesson-row-copy"><strong>{lesson.title}</strong><span>{lesson.description}</span><small>{lesson.estimatedMinutes} {t.minutesShort} · {t.draft}</small></div><button className="round-action" aria-label={t.next} onClick={() => openLesson(lesson)}><Play size={17} /></button></article>)}</div>;
 }
 
 function EmptyState({ title, text }: { title: string; text: string }) {
@@ -416,7 +398,7 @@ function ChoiceActivity({ step, objectiveId, onAttempt, onComplete, t }: { step:
     const question: ChoiceQuestion = {
       id: step.questionId, objectiveId, prompt: step.prompt,
       options: step.options, correctOptionId: step.answerId,
-      explanationCorrect: step.explanation, explanationIncorrect: 'هذه ليست الإجابة المطلوبة. ' + step.explanation
+      explanationCorrect: step.explanation, explanationIncorrect: t.incorrectChoicePrefix + step.explanation
     };
     const result = gradeChoice(question, selected);
     setFeedback({ correct: result.correct, text: result.feedback });
