@@ -39,7 +39,12 @@ export async function preflightCurriculumStorage(
     return { ok: true, requiredBytes, availableBytes: null };
   }
 
-  const estimate = await navigator.storage.estimate().catch(() => undefined);
+  let estimate: StorageEstimate | undefined;
+  try {
+    estimate = await navigator.storage.estimate();
+  } catch {
+    return { ok: true, requiredBytes, availableBytes: null };
+  }
   if (typeof estimate?.quota !== 'number' || typeof estimate.usage !== 'number') {
     return { ok: true, requiredBytes, availableBytes: null };
   }
@@ -173,9 +178,12 @@ export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<D
     if (manifestResponse.status === 404) return { ok: false, reason: 'not_found' };
     if (!manifestResponse.ok) return { ok: false, reason: 'provider_unavailable' };
 
+    const manifestBytes = await readBoundedResponse(manifestResponse, 2 * 1024 * 1024);
+    if (!manifestBytes) return { ok: false, reason: 'invalid_manifest' };
+
     let manifestInput: unknown;
     try {
-      manifestInput = await manifestResponse.json() as unknown;
+      manifestInput = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes)) as unknown;
     } catch {
       return { ok: false, reason: 'invalid_manifest' };
     }
