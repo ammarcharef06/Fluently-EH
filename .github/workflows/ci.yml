@@ -27,8 +27,6 @@ jobs:
       - name: Install pinned pnpm
         run: npm install --global pnpm@12.16.1
       - name: Install workspace dependencies
-        run: pnpm install --no-frozen-lockfile --ignore-scripts
-      - name: Verify generated lockfile
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: TypeScript checks
         run: pnpm run typecheck
