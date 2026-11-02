@@ -35,6 +35,8 @@
         .status-dot.offline { background-color: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
+        .error-banner { display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-weight: bold; text-align: center; }
+
         .rules-box { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); border-radius: 8px; padding: 1rem; margin-bottom: 2rem; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
         .rule { font-size: 0.85rem; font-weight: bold; color: var(--danger); }
 
@@ -95,6 +97,8 @@
         </div>
     </header>
 
+    <div class="error-banner" id="error-banner"></div>
+
     <div class="rules-box">
         <span class="rule">🚫 لا IPA</span>
         <span class="rule">🚫 لا تقييم صوتي</span>
@@ -125,9 +129,9 @@
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;" id="ci-name"></div>
         </div>
         <div class="deploy-card">
-            <h3>حالة النشر (Deployment)</h3>
-            <div class="deploy-value" id="deploy-status">جارٍ الجلب...</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;" id="deploy-link"></div>
+            <h3>حالة النشر (GitHub Pages)</h3>
+            <div class="deploy-value" id="pages-status">جارٍ الجلب...</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;" id="pages-link"></div>
         </div>
     </div>
 
@@ -188,6 +192,7 @@
     const refreshBtn = document.getElementById('refresh-btn');
     const themeBtn = document.getElementById('theme-btn');
     const lastUpdatedSpan = document.getElementById('last-updated');
+    const errorBanner = document.getElementById('error-banner');
 
     // --- إدارة المظهر ---
     const savedTheme = localStorage.getItem('fluently_theme') || 'dark';
@@ -219,9 +224,66 @@
         if (isLive) {
             statusDot.className = 'status-dot live';
             statusText.textContent = message || 'متصل';
+            errorBanner.style.display = 'none';
         } else {
             statusDot.className = 'status-dot offline';
             statusText.textContent = message || 'غير متصل';
+        }
+    }
+
+    function showError(msg) {
+        errorBanner.textContent = msg;
+        errorBanner.style.display = 'block';
+    }
+
+    // --- جلب البيانات وتحديث الواجهة ---
+    async function fetchDashboardData(isManual = false) {
+        if (isManual) refreshBtn.classList.add('spin');
+        
+        try {
+            const t = Date.now();
+            
+            // جلب البيانات
+            const [repoRes, commitsRes, runsRes, pagesRes] = await Promise.all([
+                fetch(`${API_BASE}?t=${t}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } }),
+                fetch(`${API_BASE}/commits?sha=${BRANCH}&per_page=5&t=${t}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } }),
+                fetch(`${API_BASE}/actions/runs?branch=${BRANCH}&per_page=1&t=${t}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } }),
+                fetch(`${API_BASE}/pages?t=${t}`, { headers: { 'Accept': 'application/vnd.github.v3+json' } })
+            ]);
+
+            // التحقق من Rate Limit
+            if (repoRes.status === 403 || repoRes.status === 429) {
+                showError("⚠️ تم تجاوز الحد المسموح به لطلبات GitHub (Rate Limit). يرجى الانتظار قليلاً قبل تحديث الصفحة.");
+                setLiveStatus(false, 'تجاوز الحد المسموح');
+                if (isManual) refreshBtn.classList.remove('spin');
+                return;
+            }
+
+            const repoData = repoRes.ok ? await repoRes.json() : null;
+            const commitsData = commitsRes.ok ? await commitsRes.json() : null;
+            const runsData = runsRes.ok ? await runsRes.json() : null;
+            const pagesData = pagesRes.ok ? await pagesRes.json() : null;
+
+            // حفظ في التخزين المؤقت
+            const cacheData = { repoData, commitsData, runsData, pagesData, timestamp: Date.now() };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+
+            updateUI(cacheData, false);
+            setLiveStatus(true, 'متصل - بيانات حية');
+
+        } catch (error) {
+            console.error('Fetch error:', error);
+            showError("⚠️ تعذر الاتصال بـ GitHub. يتم عرض بيانات مؤرشفة.");
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const cacheData = JSON.parse(cached);
+                updateUI(cacheData, true);
+                setLiveStatus(false, 'غير متصل - بيانات مؤرشفة');
+            } else {
+                setLiveStatus(false, 'غير متصل - لا توجد بيانات');
+            }
+        } finally {
+            if (isManual) setTimeout(() => refreshBtn.classList.remove('spin'), 500);
         }
     }
 
@@ -248,43 +310,48 @@
             }
             ciNameEl.textContent = `${run.name} - ${timeAgo(run.updated_at)}`;
         } else {
-            ciEl.textContent = 'ℹ️ لا توجد بيانات'; ciEl.className = 'deploy-value';
+            ciEl.textContent = 'ℹ️ لا توجد بيانات (لم يتم إعداد CI بعد)'; ciEl.className = 'deploy-value';
+            ciNameEl.textContent = '';
         }
 
-        // 3. حالة النشر (Deployments API)
-        const deployEl = document.getElementById('deploy-status');
-        const deployLinkEl = document.getElementById('deploy-link');
-        if (data.deploymentsData && data.deploymentsData.length > 0) {
-            const latestDeploy = data.deploymentsData[0];
-            if (latestDeploy.state === 'success') {
-                deployEl.textContent = '✅ منشور بنجاح';
-                deployEl.className = 'deploy-value text-success';
-                // جلب رابط البيئة إن وجد
-                if (latestDeploy.environment_url) {
-                    deployLinkEl.innerHTML = `<a href="${latestDeploy.environment_url}" target="_blank" style="color:var(--primary);">زيارة الموقع ↗</a>`;
+        // 3. حالة النشر (GitHub Pages API)
+        const pagesEl = document.getElementById('pages-status');
+        const pagesLinkEl = document.getElementById('pages-link');
+        if (data.pagesData) {
+            if (data.pagesData.status === 'built') {
+                pagesEl.textContent = '✅ منشور بنجاح';
+                pagesEl.className = 'deploy-value text-success';
+                if (data.pagesData.html_url) {
+                    pagesLinkEl.innerHTML = `<a href="${data.pagesData.html_url}" target="_blank" style="color:var(--primary);">زيارة الموقع ↗</a>`;
                 } else {
-                    deployLinkEl.textContent = `البيئة: ${latestDeploy.environment}`;
+                    pagesLinkEl.textContent = 'الموقع جاهز';
                 }
-            } else if (latestDeploy.state === 'in_progress' || latestDeploy.state === 'queued') {
-                deployEl.textContent = '⏳ جارٍ النشر...';
-                deployEl.className = 'deploy-value text-warning';
-            } else if (latestDeploy.state === 'failure' || latestDeploy.state === 'error') {
-                deployEl.textContent = '❌ فشل النشر';
-                deployEl.className = 'deploy-value text-danger';
+            } else if (data.pagesData.status === 'building') {
+                pagesEl.textContent = '⏳ جارٍ البناء...';
+                pagesEl.className = 'deploy-value text-warning';
+                pagesLinkEl.textContent = '';
+            } else if (data.pagesData.status === 'errored') {
+                pagesEl.textContent = '❌ فشل النشر';
+                pagesEl.className = 'deploy-value text-danger';
+                pagesLinkEl.textContent = '';
             } else {
-                deployEl.textContent = 'ℹ️ ' + latestDeploy.state;
-                deployEl.className = 'deploy-value';
+                pagesEl.textContent = 'ℹ️ ' + data.pagesData.status;
+                pagesEl.className = 'deploy-value';
+                pagesLinkEl.textContent = '';
             }
         } else {
-            deployEl.textContent = 'ℹ️ لا توجد عمليات نشر';
-            deployEl.className = 'deploy-value';
+            pagesEl.textContent = 'ℹ️ GitHub Pages غير مفعل أو لا توجد بيانات';
+            pagesEl.className = 'deploy-value';
+            pagesLinkEl.textContent = '';
         }
 
         // 4. الخط الزمني (مبني على البيانات الحية)
+        // المرحلة 0 مكتملة إذا كان هناك Commits.
+        // المرحلة 1 تعتبر مكتملة إذا تم بناء الموقع (Pages Built).
         const phases = [
-            { id: 'phase_0', isDone: data.commitsData && data.commitsData.length > 0 },
-            { id: 'phase_1', isDone: data.runsData && data.runsData.workflow_runs.length > 0 },
-            { id: 'phase_2', isDone: data.repoData && data.repoData.size > 0 }, // افتراضي
+            { id: 'phase_0', isDone: data.commitsData && data.commitsData.length > 0, textDone: 'مكتمل' },
+            { id: 'phase_1', isDone: data.pagesData && data.pagesData.status === 'built', textDone: 'مكتمل (البناء الأولي)' },
+            { id: 'phase_2', isDone: false },
             { id: 'phase_3', isDone: false },
             { id: 'phase_4', isDone: false },
             { id: 'phase_5', isDone: false },
@@ -295,7 +362,7 @@
             const el = document.getElementById(p.id);
             if (el) {
                 if (p.isDone) {
-                    el.textContent = 'مكتمل';
+                    el.textContent = p.textDone || 'مكتمل';
                     el.className = 'status done';
                 } else {
                     el.textContent = 'قيد الانتظار';
@@ -321,50 +388,6 @@
         // 6. وقت آخر تحديث
         const timestamp = isOffline ? data.timestamp : Date.now();
         lastUpdatedSpan.textContent = `آخر تحديث: ${timeAgo(new Date(timestamp).toISOString())} ${isOffline ? '(مؤرشف)' : ''}`;
-    }
-
-    // --- جلب البيانات ---
-    async function fetchDashboardData(isManual = false) {
-        if (isManual) refreshBtn.classList.add('spin');
-        
-        try {
-            const t = Date.now();
-            
-            // جلب كل البيانات
-            const [repoRes, commitsRes, runsRes, pagesRes, deploymentsRes] = await Promise.all([
-                fetch(`${API_BASE}?t=${t}`),
-                fetch(`${API_BASE}/commits?sha=${BRANCH}&per_page=5&t=${t}`),
-                fetch(`${API_BASE}/actions/runs?branch=${BRANCH}&per_page=1&t=${t}`),
-                fetch(`${API_BASE}/pages?t=${t}`), // نحتفظ بها كاحتياط
-                fetch(`${API_BASE}/deployments?per_page=1&t=${t}`) // Deployments API
-            ]);
-
-            const repoData = repoRes.ok ? await repoRes.json() : null;
-            const commitsData = commitsRes.ok ? await commitsRes.json() : null;
-            const runsData = runsRes.ok ? await runsRes.json() : null;
-            const pagesData = pagesRes.ok ? await pagesRes.json() : null;
-            const deploymentsData = deploymentsRes.ok ? await deploymentsRes.json() : null;
-
-            // حفظ في التخزين المؤقت
-            const cacheData = { repoData, commitsData, runsData, pagesData, deploymentsData, timestamp: Date.now() };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-
-            updateUI(cacheData, false);
-            setLiveStatus(true, 'متصل - بيانات حية');
-
-        } catch (error) {
-            console.error('Fetch error:', error);
-            const cached = localStorage.getItem(CACHE_KEY);
-            if (cached) {
-                const cacheData = JSON.parse(cached);
-                updateUI(cacheData, true);
-                setLiveStatus(false, 'غير متصل - بيانات مؤرشفة');
-            } else {
-                setLiveStatus(false, 'غير متصل - لا توجد بيانات');
-            }
-        } finally {
-            if (isManual) setTimeout(() => refreshBtn.classList.remove('spin'), 500);
-        }
     }
 
     // --- بدء التشغيل ---
