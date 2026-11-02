@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fluently-EH | لوحة التقدم</title>
+    <title>Fluently-EH | لوحة المتابعة الحية</title>
     <style>
         :root {
             --bg: #0f172a;
@@ -15,6 +15,9 @@
             --warning: #f59e0b;
             --danger: #ef4444;
             --border: #334155;
+            --live-green: #22c55e;
+            --offline-red: #ef4444;
+            --pending-yellow: #eab308;
         }
 
         * {
@@ -32,23 +35,62 @@
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
         }
 
         header {
-            text-align: center;
-            margin-bottom: 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         header h1 {
-            font-size: 2.5rem;
+            font-size: 2rem;
             color: var(--primary);
-            margin-bottom: 0.5rem;
         }
 
-        header p {
-            color: var(--text-muted);
+        /* مؤشر الحالة الحية */
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--pending-yellow);
+            box-shadow: 0 0 8px var(--pending-yellow);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .status-dot.live {
+            background-color: var(--live-green);
+            box-shadow: 0 0 12px var(--live-green);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.offline {
+            background-color: var(--offline-red);
+            box-shadow: 0 0 12px var(--offline-red);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
         }
 
         /* القواعد الحمراء */
@@ -70,39 +112,45 @@
             color: #fca5a5;
         }
 
-        /* شريط التقدم */
-        .progress-section {
+        /* شبكة المعلومات الحية */
+        .live-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .live-card {
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 1.5rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
 
-        .progress-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 1rem;
+        .live-card h3 {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .live-value {
+            font-size: 1.5rem;
             font-weight: bold;
+            color: var(--text);
         }
 
-        .progress-bar-bg {
-            width: 100%;
-            height: 12px;
-            background: var(--border);
-            border-radius: 6px;
-            overflow: hidden;
+        .live-value.status-success { color: var(--success); }
+        .live-value.status-failure { color: var(--danger); }
+        .live-value.status-pending { color: var(--warning); }
+
+        .live-detail {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            word-break: break-all;
         }
 
-        .progress-bar-fill {
-            height: 100%;
-            width: 15%; /* النسبة الإجمالية التقريبية */
-            background: linear-gradient(90deg, var(--primary), var(--success));
-            border-radius: 6px;
-        }
-
-        /* الخط الزمني */
+        /* الخط الزمني للمراحل */
         .timeline {
             display: flex;
             flex-direction: column;
@@ -160,7 +208,10 @@
 <div class="container">
     <header>
         <h1>Fluently-EH</h1>
-        <p>لوحة متابعة تقدم المشروع من الصفر حتى الإطلاق</p>
+        <div class="live-indicator">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">جارٍ الاتصال بـ GitHub...</span>
+        </div>
     </header>
 
     <div class="rules-box">
@@ -171,18 +222,27 @@
         <span class="rule">✅ يعمل دون اتصال</span>
     </div>
 
-    <div class="progress-section">
-        <div class="progress-header">
-            <span>نسبة الإنجاز الكلية التقريبية</span>
-            <span>15%</span>
+    <!-- بيانات حية من GitHub -->
+    <div class="live-grid">
+        <div class="live-card">
+            <h3>آخر حالة نشر (Deployment)</h3>
+            <div class="live-value" id="deploy-status">—</div>
+            <div class="live-detail" id="deploy-detail">جارٍ الجلب...</div>
         </div>
-        <div class="progress-bar-bg">
-            <div class="progress-bar-fill"></div>
+        <div class="live-card">
+            <h3>آخر سير عمل (Workflow)</h3>
+            <div class="live-value" id="workflow-status">—</div>
+            <div class="live-detail" id="workflow-detail">جارٍ الجلب...</div>
+        </div>
+        <div class="live-card">
+            <h3>آخر تحديث برمجي</h3>
+            <div class="live-value" id="commit-status">—</div>
+            <div class="live-detail" id="commit-detail">جارٍ الجلب...</div>
         </div>
     </div>
 
+    <!-- الخط الزمني للمراحل -->
     <div class="timeline">
-        <!-- المرحلة 0 -->
         <div class="phase-card">
             <div class="phase-info">
                 <h3>المرحلة 0: التوثيق والتخطيط</h3>
@@ -190,8 +250,6 @@
             </div>
             <span class="status done">مكتمل 100%</span>
         </div>
-
-        <!-- المرحلة 1 -->
         <div class="phase-card">
             <div class="phase-info">
                 <h3>المرحلة 1: إثبات الجدوى</h3>
@@ -199,8 +257,6 @@
             </div>
             <span class="status active">قيد التشخيص</span>
         </div>
-
-        <!-- المرحلة 2 -->
         <div class="phase-card">
             <div class="phase-info">
                 <h3>المرحلة 2: أساس المستودع</h3>
@@ -208,8 +264,6 @@
             </div>
             <span class="status pending">لم يبدأ</span>
         </div>
-
-        <!-- المرحلة 3 -->
         <div class="phase-card">
             <div class="phase-info">
                 <h3>المرحلة 3: محرك المنهج</h3>
@@ -217,8 +271,6 @@
             </div>
             <span class="status pending">لم يبدأ</span>
         </div>
-
-        <!-- المرحلة 4 -->
         <div class="phase-card">
             <div class="phase-info">
                 <h3>المرحلة 4: محرك التقييم</h3>
@@ -226,8 +278,6 @@
             </div>
             <span class="status pending">لم يبدأ</span>
         </div>
-
-        <!-- المرحلة 5 -->
         <div class="phase-card">
             <div class="phase-info">
                 <h3>المرحلة 5: الواجهات (Web/App)</h3>
@@ -235,8 +285,6 @@
             </div>
             <span class="status pending">لم يبدأ</span>
         </div>
-        
-        <!-- المرحلة 6 فما فوق -->
         <div class="phase-card">
             <div class="phase-info">
                 <h3>المراحل 6 - 11: الإدارة والمحتوى والإطلاق</h3>
@@ -247,9 +295,168 @@
     </div>
 
     <footer>
-        <p>تم التحديث يدوياً بناءً على وثائق المستودع - فرع <code>main</code></p>
+        <p>لوحة متابعة حية - تُحدث تلقائياً كل 60 ثانية</p>
     </footer>
 </div>
+
+<script>
+    // إعدادات المستودع
+    const OWNER = 'ammarcharef06';
+    const REPO = 'Fluently-EH';
+    const BRANCH = 'main'; // أو 'implementation/full-build' إذا كان هذا هو الفرع النشط
+    const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}`;
+
+    // عناصر DOM
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const deployStatus = document.getElementById('deploy-status');
+    const deployDetail = document.getElementById('deploy-detail');
+    const workflowStatus = document.getElementById('workflow-status');
+    const workflowDetail = document.getElementById('workflow-detail');
+    const commitStatus = document.getElementById('commit-status');
+    const commitDetail = document.getElementById('commit-detail');
+
+    // دالة لتحديث مؤشر الحالة
+    function setLiveStatus(isLive, message) {
+        if (isLive) {
+            statusDot.className = 'status-dot live';
+            statusText.textContent = message || 'متصل - بيانات حية';
+        } else {
+            statusDot.className = 'status-dot offline';
+            statusText.textContent = message || 'غير متصل - تعذر جلب البيانات';
+        }
+    }
+
+    // دالة لجلب البيانات من GitHub
+    async function fetchGitHubData() {
+        try {
+            // 1. جلب حالة النشر (Deployment) - نستخدم GitHub Pages API
+            const pagesRes = await fetch(`${API_BASE}/pages`);
+            if (pagesRes.ok) {
+                const pagesData = await pagesRes.json();
+                const pageStatus = pagesData.status; // 'built', 'building', 'errored', 'null'
+                
+                let statusTextValue = 'غير معروف';
+                let statusClass = '';
+                
+                if (pageStatus === 'built') {
+                    statusTextValue = '✅ منشور بنجاح';
+                    statusClass = 'status-success';
+                } else if (pageStatus === 'building') {
+                    statusTextValue = '⏳ جارٍ النشر...';
+                    statusClass = 'status-pending';
+                } else if (pageStatus === 'errored') {
+                    statusTextValue = '❌ فشل النشر';
+                    statusClass = 'status-failure';
+                } else {
+                    statusTextValue = 'ℹ️ لم يتم النشر بعد';
+                    statusClass = 'status-pending';
+                }
+                
+                deployStatus.textContent = statusTextValue;
+                deployStatus.className = `live-value ${statusClass}`;
+                deployDetail.textContent = pagesData.html_url || 'لا يوجد رابط';
+            } else {
+                // إذا لم تكن الصفحات مفعلة، قد يكون المستودع لا يستخدم GitHub Pages بعد
+                deployStatus.textContent = 'ℹ️ GitHub Pages غير مفعل';
+                deployStatus.className = 'live-value status-pending';
+                deployDetail.textContent = 'لم يتم العثور على بيانات النشر';
+            }
+
+            // 2. جلب آخر سير عمل (Workflow Run)
+            const runsRes = await fetch(`${API_BASE}/actions/runs?branch=${BRANCH}&per_page=1`);
+            if (runsRes.ok) {
+                const runsData = await runsRes.json();
+                if (runsData.workflow_runs && runsData.workflow_runs.length > 0) {
+                    const latestRun = runsData.workflow_runs[0];
+                    const runStatus = latestRun.status;
+                    const runConclusion = latestRun.conclusion;
+                    
+                    let workflowText = 'غير معروف';
+                    let workflowClass = '';
+                    
+                    if (runStatus === 'completed') {
+                        if (runConclusion === 'success') {
+                            workflowText = '✅ نجح';
+                            workflowClass = 'status-success';
+                        } else if (runConclusion === 'failure') {
+                            workflowText = '❌ فشل';
+                            workflowClass = 'status-failure';
+                        } else if (runConclusion === 'cancelled') {
+                            workflowText = '⏹️ ألغي';
+                            workflowClass = 'status-pending';
+                        } else {
+                            workflowText = '⚠️ ' + runConclusion;
+                            workflowClass = 'status-pending';
+                        }
+                    } else if (runStatus === 'in_progress') {
+                        workflowText = '⏳ قيد التنفيذ';
+                        workflowClass = 'status-pending';
+                    } else {
+                        workflowText = '⏸️ في الانتظار';
+                        workflowClass = 'status-pending';
+                    }
+                    
+                    workflowStatus.textContent = workflowText;
+                    workflowStatus.className = `live-value ${workflowClass}`;
+                    workflowDetail.textContent = `${latestRun.name} - ${new Date(latestRun.updated_at).toLocaleString('ar-DZ')}`;
+                } else {
+                    workflowStatus.textContent = 'ℹ️ لا توجد سير عمل';
+                    workflowStatus.className = 'live-value status-pending';
+                    workflowDetail.textContent = 'لم يتم العثور على تشغيلات حديثة';
+                }
+            } else {
+                workflowStatus.textContent = '⚠️ تعذر الجلب';
+                workflowStatus.className = 'live-value status-failure';
+                workflowDetail.textContent = 'قد يكون هناك حد للطلبات';
+            }
+
+            // 3. جلب آخر تحديث برمجي (Commit)
+            const commitsRes = await fetch(`${API_BASE}/commits?sha=${BRANCH}&per_page=1`);
+            if (commitsRes.ok) {
+                const commitsData = await commitsRes.json();
+                if (commitsData.length > 0) {
+                    const latestCommit = commitsData[0];
+                    const commitMessage = latestCommit.commit.message.split('\n')[0];
+                    const commitDate = new Date(latestCommit.commit.author.date);
+                    
+                    commitStatus.textContent = '📝 ' + latestCommit.sha.substring(0, 7);
+                    commitStatus.className = 'live-value';
+                    commitDetail.textContent = `${commitMessage} - ${commitDate.toLocaleString('ar-DZ')}`;
+                } else {
+                    commitStatus.textContent = 'ℹ️ لا توجد تحديثات';
+                    commitDetail.textContent = 'لم يتم العثور على التزامات';
+                }
+            } else {
+                commitStatus.textContent = '⚠️ تعذر الجلب';
+                commitStatus.className = 'live-value status-failure';
+                commitDetail.textContent = 'قد يكون هناك حد للطلبات';
+            }
+
+            // تحديث مؤشر الحالة إلى أخضر (متصل)
+            setLiveStatus(true, 'متصل - بيانات حية');
+            
+        } catch (error) {
+            console.error('خطأ في جلب البيانات:', error);
+            // تحديث مؤشر الحالة إلى أحمر (غير متصل)
+            setLiveStatus(false, 'غير متصل - فشل الاتصال بـ GitHub');
+            
+            // عرض رسالة خطأ في البطاقات
+            deployStatus.textContent = '❌ خطأ';
+            deployDetail.textContent = 'تعذر الاتصال بـ GitHub API';
+            workflowStatus.textContent = '❌ خطأ';
+            workflowDetail.textContent = 'تعذر الاتصال بـ GitHub API';
+            commitStatus.textContent = '❌ خطأ';
+            commitDetail.textContent = 'تعذر الاتصال بـ GitHub API';
+        }
+    }
+
+    // تشغيل الجلب فور تحميل الصفحة
+    fetchGitHubData();
+
+    // تحديث البيانات كل 60 ثانية (60000 مللي ثانية)
+    setInterval(fetchGitHubData, 60000);
+</script>
 
 </body>
 </html>
