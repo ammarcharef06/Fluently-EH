@@ -96,15 +96,16 @@ function decodeFilename(bytes: Uint8Array, flags: number): string {
     fail('unsupported_archive', 'ZIP filenames without the UTF-8 flag must be ASCII.');
   }
 
+  let name: string;
   try {
-    const name = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    if (name.normalize('NFC') !== name) {
-      fail('unsupported_archive', 'ZIP filenames must use Unicode NFC normalization.');
-    }
-    return name;
+    name = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
     fail('invalid_archive', 'A ZIP filename is not valid UTF-8.');
   }
+  if (name.normalize('NFC') !== name) {
+    fail('unsupported_archive', 'ZIP filenames must use Unicode NFC normalization.');
+  }
+  return name;
 }
 
 function validateExtraFields(view: DataView, offset: number, length: number): void {
@@ -153,9 +154,10 @@ function validateEntryAttributes(
 
   const creatorOperatingSystem = madeBy >>> 8;
   const unixMode = externalAttributes >>> 16;
-  const dosAttributes = externalAttributes & 0xff;
-
-  if (dosAttributes & 0x10) fail('unsupported_archive', 'Directory attributes are not allowed in curriculum ZIP files.');
+  const dosAttributes = externalAttributes & 0xffff;
+  if (dosAttributes & (0x08 | 0x10 | 0x0400)) {
+    fail('unsupported_archive', 'Volume labels, directory entries, and reparse points are not allowed in curriculum ZIP files.');
+  }
 
   if (creatorOperatingSystem === 3 && unixMode !== 0) {
     const fileType = unixMode & 0xf000;
@@ -180,13 +182,16 @@ function parseDataDescriptor(
     u32(view, candidate + 4) === entry.compressedSize &&
     u32(view, candidate + 8) === entry.uncompressedSize;
 
-  if (hasRange(view, offset, 16) &&
-      u32(view, offset) === ZIP_DATA_DESCRIPTOR_SIGNATURE &&
-      matches(offset + 4)) {
+  if (
+    offset + 16 <= limit &&
+    hasRange(view, offset, 16) &&
+    u32(view, offset) === ZIP_DATA_DESCRIPTOR_SIGNATURE &&
+    matches(offset + 4)
+  ) {
     return offset + 16;
   }
 
-  if (matches(offset)) return offset + 12;
+  if (offset + 12 <= limit && matches(offset)) return offset + 12;
   if (offset + 12 > limit) fail('invalid_archive', 'Truncated ZIP data descriptor.');
   fail('invalid_archive', 'ZIP data descriptor does not match the central directory.');
 }
@@ -595,7 +600,12 @@ export async function importCurriculumZip(
 
     const files = new Map(extracted);
     files.delete(ROOT_MANIFEST_PATH);
-    const activation = await activateCurriculumPackage(expectedManifest, files);
+    let activation: Awaited<ReturnType<typeof activateCurriculumPackage>>;
+    try {
+      activation = await activateCurriculumPackage(expectedManifest, files);
+    } catch {
+      fail('storage_failed', 'The verified ZIP could not be committed to local storage.');
+    }
     if (!activation.ok) {
       return { ok: false, reason: 'integrity_failed', errors: activation.errors };
     }
@@ -607,8 +617,8 @@ export async function importCurriculumZip(
     }
     return {
       ok: false,
-      reason: 'storage_failed',
-      errors: ['The ZIP could not be imported into local storage.']
+      reason: 'invalid_archive',
+      errors: ['The ZIP archive could not be parsed safely.']
     };
   }
 }
