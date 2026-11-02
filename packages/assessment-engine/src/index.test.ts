@@ -334,6 +334,16 @@ describe('placement calibration', () => {
     }
   });
 
+  it('does not fall back to an unconfigured lowest stage when evidence fails its threshold', () => {
+    const incorrectResponses = placementResponses.map((response) => ({ ...response, correct: false }));
+    const result = evaluatePlacement(calibratedBlueprint, incorrectResponses);
+
+    expect(result.status).toBe('below_placement_range');
+    if (result.status === 'below_placement_range') {
+      expect(result.stageSkillRates.a1).toEqual({ reading: 0, grammar: 0 });
+    }
+  });
+
   it('uses stage-specific evidence instead of applying one aggregate skill rate to every stage', () => {
     const multiStageBlueprint: PlacementBlueprint = {
       version: 'multi-stage-placement',
