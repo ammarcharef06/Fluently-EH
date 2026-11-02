@@ -251,8 +251,9 @@ describe('placement calibration', () => {
       sampleSize: 20,
       approvedBy: 'unit-test-reviewer',
       approvedAt: '2026-10-01T00:00:00.000Z',
-      thresholds: { reading: 0.75, grammar: 0.75 },
-      minimumResponsesBySkill: { reading: 2, grammar: 2 }
+      thresholdsByStageSkill: { a1: { reading: 0.75, grammar: 0.75 } },
+      minimumResponsesByStageSkill: { a1: { reading: 2, grammar: 2 } },
+      minimumDistinctContextsByStageSkill: { a1: { reading: 2, grammar: 2 } }
     }
   };
 
@@ -272,7 +273,7 @@ describe('placement calibration', () => {
       ...calibratedBlueprint,
       calibration: {
         ...calibratedBlueprint.calibration!,
-        minimumResponsesBySkill: { reading: 2 }
+        minimumResponsesByStageSkill: { a1: { reading: 2 } }
       }
     };
     const result = evaluatePlacement(missingPolicy, placementResponses);
@@ -287,10 +288,21 @@ describe('placement calibration', () => {
       ...calibratedBlueprint,
       calibration: {
         ...calibratedBlueprint.calibration!,
-        minimumResponsesBySkill: { reading: 3, grammar: 2 }
+        minimumResponsesByStageSkill: { a1: { reading: 3, grammar: 2 } }
       }
     };
     expect(evaluatePlacement(invalidBlueprint, placementResponses).status).toBe('calibration_required');
+  });
+
+  it('requires explicit context-diversity policy for every stage and skill', () => {
+    const missingContextPolicy: PlacementBlueprint = {
+      ...calibratedBlueprint,
+      calibration: {
+        ...calibratedBlueprint.calibration!,
+        minimumDistinctContextsByStageSkill: { a1: { reading: 2 } }
+      }
+    };
+    expect(evaluatePlacement(missingContextPolicy, placementResponses).status).toBe('calibration_required');
   });
 
   it('does not apply a built-in evidence minimum to an empty blueprint', () => {
@@ -319,6 +331,60 @@ describe('placement calibration', () => {
       expect(result.recommendedStage).toBe('a1');
       expect(result.skillRates).toEqual({ reading: 1, grammar: 1 });
       expect(result.evidenceCount).toBe(4);
+    }
+  });
+
+  it('uses stage-specific evidence instead of applying one aggregate skill rate to every stage', () => {
+    const multiStageBlueprint: PlacementBlueprint = {
+      version: 'multi-stage-placement',
+      status: 'calibrated',
+      items: [
+        { id: 'a1.read.1', stage: 'a1', skill: 'reading', objectiveId: 'reading.a1', weight: 1 },
+        { id: 'a1.read.2', stage: 'a1', skill: 'reading', objectiveId: 'reading.a1', weight: 1 },
+        { id: 'a1.grammar.1', stage: 'a1', skill: 'grammar', objectiveId: 'grammar.a1', weight: 1 },
+        { id: 'a1.grammar.2', stage: 'a1', skill: 'grammar', objectiveId: 'grammar.a1', weight: 1 },
+        { id: 'b1.read.1', stage: 'b1', skill: 'reading', objectiveId: 'reading.b1', weight: 1 },
+        { id: 'b1.read.2', stage: 'b1', skill: 'reading', objectiveId: 'reading.b1', weight: 1 },
+        { id: 'b1.grammar.1', stage: 'b1', skill: 'grammar', objectiveId: 'grammar.b1', weight: 1 },
+        { id: 'b1.grammar.2', stage: 'b1', skill: 'grammar', objectiveId: 'grammar.b1', weight: 1 }
+      ],
+      calibration: {
+        blueprintVersion: 'multi-stage-placement',
+        sampleSize: 30,
+        approvedBy: 'unit-test-reviewer',
+        approvedAt: '2026-10-01T00:00:00.000Z',
+        thresholdsByStageSkill: {
+          a1: { reading: 0.75, grammar: 0.75 },
+          b1: { reading: 0.75, grammar: 0.75 }
+        },
+        minimumResponsesByStageSkill: {
+          a1: { reading: 2, grammar: 2 },
+          b1: { reading: 2, grammar: 2 }
+        },
+        minimumDistinctContextsByStageSkill: {
+          a1: { reading: 2, grammar: 2 },
+          b1: { reading: 2, grammar: 2 }
+        }
+      }
+    };
+    const responses = [
+      { itemId: 'a1.read.1', skill: 'reading' as const, objectiveId: 'reading.a1', correct: true, contextId: 'a1-story', answeredAt: '2026-11-01T10:00:00.000Z' },
+      { itemId: 'a1.read.2', skill: 'reading' as const, objectiveId: 'reading.a1', correct: true, contextId: 'a1-sign', answeredAt: '2026-11-01T10:01:00.000Z' },
+      { itemId: 'a1.grammar.1', skill: 'grammar' as const, objectiveId: 'grammar.a1', correct: true, contextId: 'a1-chat', answeredAt: '2026-11-01T10:02:00.000Z' },
+      { itemId: 'a1.grammar.2', skill: 'grammar' as const, objectiveId: 'grammar.a1', correct: true, contextId: 'a1-dialogue', answeredAt: '2026-11-01T10:03:00.000Z' },
+      { itemId: 'b1.read.1', skill: 'reading' as const, objectiveId: 'reading.b1', correct: false, contextId: 'b1-story', answeredAt: '2026-11-01T10:04:00.000Z' },
+      { itemId: 'b1.read.2', skill: 'reading' as const, objectiveId: 'reading.b1', correct: false, contextId: 'b1-sign', answeredAt: '2026-11-01T10:05:00.000Z' },
+      { itemId: 'b1.grammar.1', skill: 'grammar' as const, objectiveId: 'grammar.b1', correct: false, contextId: 'b1-chat', answeredAt: '2026-11-01T10:06:00.000Z' },
+      { itemId: 'b1.grammar.2', skill: 'grammar' as const, objectiveId: 'grammar.b1', correct: false, contextId: 'b1-dialogue', answeredAt: '2026-11-01T10:07:00.000Z' }
+    ];
+    const result = evaluatePlacement(multiStageBlueprint, responses);
+
+    expect(result.status).toBe('placed');
+    if (result.status === 'placed') {
+      expect(result.recommendedStage).toBe('a1');
+      expect(result.skillRates).toEqual({ reading: 0.5, grammar: 0.5 });
+      expect(result.stageSkillRates.a1).toEqual({ reading: 1, grammar: 1 });
+      expect(result.stageSkillRates.b1).toEqual({ reading: 0, grammar: 0 });
     }
   });
 
