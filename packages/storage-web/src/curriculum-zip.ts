@@ -138,9 +138,12 @@ function hasExecutableExtension(path: string): boolean {
   const filename = path.split('/').at(-1) ?? '';
   const extension = filename.includes('.') ? filename.split('.').at(-1)?.toLowerCase() : '';
   return new Set([
-    'apk', 'bat', 'bin', 'class', 'cmd', 'com', 'cjs', 'dll', 'dylib',
-    'exe', 'htm', 'html', 'jar', 'js', 'mjs', 'msi', 'php', 'pl',
-    'ps1', 'py', 'rb', 'sh', 'so', 'wasm'
+    'apk', 'app', 'bat', 'bin', 'class', 'cmd', 'com', 'cjs', 'deb',
+    'desktop', 'dll', 'dmg', 'dylib', 'exe', 'hta', 'htm', 'html',
+    'jar', 'js', 'lnk', 'mht', 'mhtml', 'mjs', 'msi', 'php', 'pl',
+    'ps1', 'psd1', 'psm1', 'py', 'rb', 'reg', 'rpm', 'scr', 'sh',
+    'so', 'svg', 'swf', 'url', 'vbe', 'vbs', 'wasm', 'webloc', 'wsf',
+    'wsh', 'xht', 'xhtml', 'xsl', 'xslt'
   ]).has(extension ?? '');
 }
 
@@ -159,7 +162,7 @@ function validateEntryAttributes(
     fail('unsupported_archive', 'Volume labels, directory entries, and reparse points are not allowed in curriculum ZIP files.');
   }
 
-  if (creatorOperatingSystem === 3 && unixMode !== 0) {
+  if ((creatorOperatingSystem === 3 || creatorOperatingSystem === 19) && unixMode !== 0) {
     const fileType = unixMode & 0xf000;
     if (fileType !== 0 && fileType !== 0x8000) {
       fail('unsupported_archive', 'Unix symlinks and special files are not allowed in curriculum ZIP files.');
@@ -418,10 +421,16 @@ function parseZipEntries(archive: Uint8Array): ZipEntry[] {
   if (localRecords[0]?.localHeaderOffset !== 0) {
     fail('unsupported_archive', 'Self-extracting ZIP prefixes are not supported.');
   }
-  for (let index = 0; index < localRecords.length - 1; index += 1) {
-    if (localRecords[index]!.recordEnd > localRecords[index + 1]!.localHeaderOffset) {
-      fail('invalid_archive', 'ZIP local file records overlap.');
+
+  let expectedLocalOffset = 0;
+  for (const entry of localRecords) {
+    if (entry.localHeaderOffset !== expectedLocalOffset) {
+      fail('invalid_archive', 'ZIP local records contain overlapping or unparsed gaps.');
     }
+    expectedLocalOffset = entry.recordEnd;
+  }
+  if (expectedLocalOffset !== centralOffset) {
+    fail('invalid_archive', 'Unparsed bytes are present between ZIP local records and the central directory.');
   }
 
   return entries;
