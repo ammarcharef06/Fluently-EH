@@ -268,6 +268,32 @@ describe('placement calibration', () => {
     expect(evaluatePlacement(draftBlueprint, []).status).toBe('calibration_required');
   });
 
+  it('rejects self-practice as a measurable placement skill at runtime', () => {
+    const invalidBlueprint = {
+      ...calibratedBlueprint,
+      items: [{
+        ...calibratedBlueprint.items[0]!,
+        skill: 'speaking-practice'
+      }]
+    } as unknown as PlacementBlueprint;
+
+    expect(() => evaluatePlacement(invalidBlueprint, [])).toThrow('not measurable');
+  });
+
+  it('requires distinct contexts within each calibrated stage and skill', () => {
+    const sameContextResponses = placementResponses.map((response) => ({
+      ...response,
+      contextId: 'one-context'
+    }));
+    const result = evaluatePlacement(calibratedBlueprint, sameContextResponses);
+
+    expect(result.status).toBe('insufficient_evidence');
+    if (result.status === 'insufficient_evidence') {
+      expect(result.missingSkills).toEqual(expect.arrayContaining(['reading', 'grammar']));
+    }
+  });
+
+
   it('requires explicit per-skill minimum response configuration', () => {
     const missingPolicy: PlacementBlueprint = {
       ...calibratedBlueprint,
