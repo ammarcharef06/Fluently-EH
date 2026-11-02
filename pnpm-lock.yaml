@@ -294,6 +294,15 @@ importers:
       '@fluently/content-schema':
         specifier: workspace:*
         version: link:../content-schema
+      '@fluently/curriculum-engine':
+        specifier: workspace:*
+        version: link:../curriculum-engine
+
+  packages/curriculum-engine:
+    dependencies:
+      '@fluently/content-schema':
+        specifier: workspace:*
+        version: link:../content-schema
 
   packages/domain: {}
 
