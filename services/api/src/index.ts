@@ -753,19 +753,58 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
         const release = rows[0] as { id: string; package_id: string; content_version: string; package_sha256: string; status: string } | undefined;
         if (!release || release.status !== 'staged') return null;
-        const contentObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/content.json');
         const manifestObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/manifest.json');
-        if (!contentObject || !manifestObject) throw new Error('staged_release_files_missing');
-        const bytes = new Uint8Array(await new Response(contentObject.body).arrayBuffer());
-        if (await sha256Hex(bytes) !== release.package_sha256) throw new Error('staged_release_hash_mismatch');
+        const archiveObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/curriculum.zip');
+        const archiveHashObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/curriculum.zip.sha256');
+        if (!manifestObject || !archiveObject || !archiveHashObject) throw new Error('staged_release_files_missing');
+
         const manifestText = await new Response(manifestObject.body).text();
-        const manifest = JSON.parse(manifestText) as { files?: Array<{ sha256?: string }> };
-        if (manifest.files?.[0]?.sha256 !== release.package_sha256) throw new Error('staged_manifest_hash_mismatch');
-        await env.CURRICULUM_BUCKET!.put('published/' + release.id + '/content.json', bytes, {
-          httpMetadata: { contentType: 'application/json' }
-        });
+        const parsedManifest = JSON.parse(manifestText) as unknown;
+        const manifestValidation = validateCurriculumManifest(parsedManifest);
+        if (!manifestValidation.ok) throw new Error('staged_release_manifest_invalid');
+        const manifest = manifestValidation.manifest;
+        const files = new Map<string, Uint8Array>();
+
+        for (const entry of manifest.files) {
+          const stagedObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/' + entry.path);
+          if (!stagedObject || stagedObject.size !== entry.bytes) throw new Error('staged_release_file_size_mismatch');
+          const bytes = new Uint8Array(await new Response(stagedObject.body).arrayBuffer());
+          if (bytes.byteLength !== entry.bytes || await sha256Hex(bytes) !== entry.sha256) {
+            throw new Error('staged_release_file_integrity_failed');
+          }
+          files.set(entry.path, bytes);
+        }
+
+        const contentBytes = files.get('content.json');
+        if (!contentBytes || await sha256Hex(contentBytes) !== release.package_sha256) {
+          throw new Error('staged_release_content_hash_mismatch');
+        }
+
+        const archiveBytes = new Uint8Array(await new Response(archiveObject.body).arrayBuffer());
+        const archiveHash = (await new Response(archiveHashObject.body).text()).trim();
+        if (
+          archiveBytes.byteLength > MAX_PACKAGE_BYTES + 2 * 1024 * 1024 ||
+          !/^[a-f0-9]{64}$/.test(archiveHash) ||
+          await sha256Hex(archiveBytes) !== archiveHash
+        ) {
+          throw new Error('staged_release_archive_integrity_failed');
+        }
+
+        for (const [filePath, bytes] of files) {
+          const contentType = filePath.endsWith('.json')
+            ? 'application/json; charset=utf-8'
+            : filePath.endsWith('.md')
+              ? 'text/markdown; charset=utf-8'
+              : 'application/octet-stream';
+          await env.CURRICULUM_BUCKET!.put('published/' + release.id + '/' + filePath, bytes, {
+            httpMetadata: { contentType }
+          });
+        }
         await env.CURRICULUM_BUCKET!.put('published/' + release.id + '/manifest.json', manifestText, {
-          httpMetadata: { contentType: 'application/json' }
+          httpMetadata: { contentType: 'application/json; charset=utf-8' }
+        });
+        await env.CURRICULUM_BUCKET!.put('published/' + release.id + '/curriculum.zip', archiveBytes, {
+          httpMetadata: { contentType: 'application/zip' }
         });
         await tx.unsafe(
           "update curriculum_releases set status='retired' where package_id=$1 and status='published'",
