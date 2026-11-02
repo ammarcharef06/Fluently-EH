@@ -168,7 +168,7 @@ describe('grading and feedback', () => {
     expect(result.correct).toBe(false);
   });
 
-  it('collapses internal whitespace when explicitly configured', () => {
+  it('does not collapse internal whitespace unless the policy enables it', () => {
     const result = gradeTextAnswer({
       ...textQuestion,
       acceptedAnswers: ['good morning']
