@@ -23,7 +23,7 @@ export function decodeCurriculumFilePath(encodedPath: string): string | null {
       segment === '.' ||
       segment === '..' ||
       segment.includes('/') ||
-      segment.includes('\\') ||
+      segment.includes('\\')
     ) return null;
 
     decodedSegments.push(segment);
