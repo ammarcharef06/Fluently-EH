@@ -400,7 +400,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   }
 
   if (curriculumManifest && method === 'GET') return getReleaseObject(env, request, 'manifest.json');
-  if (curriculumContent && method === 'GET') return getReleaseObject(env, request, 'content.json');
+  if (curriculumContent && method === 'GET') return getReleaseFile(env, 'content.json');
   if (curriculumFileRequest && method === 'GET') {
     const filePath = decodeCurriculumFilePath(path.slice(curriculumFilesPrefix.length));
     if (!filePath) return json({ error: 'invalid_curriculum_file_path' }, 400);
