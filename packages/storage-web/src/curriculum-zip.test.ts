@@ -148,6 +148,27 @@ function setEntryDosReparsePoint(archive: Uint8Array, name: string): Uint8Array 
   });
 }
 
+function setEntryUnixExecutable(archive: Uint8Array, name: string): Uint8Array {
+  return mutateArchive(archive, (_copy, view) => {
+    const entry = directoryEntryOffsets(archive).find((candidate) => candidate.name === name);
+    if (!entry) throw new Error('test ZIP entry not found: ' + name);
+    view.setUint16(entry.centralHeaderOffset + 4, (3 << 8) | 20, true);
+    view.setUint32(entry.centralHeaderOffset + 38, ((0x8000 | 0o755) << 16) >>> 0, true);
+  });
+}
+
+function setEntryDosHidden(archive: Uint8Array, name: string): Uint8Array {
+  return mutateArchive(archive, (_copy, view) => {
+    const entry = directoryEntryOffsets(archive).find((candidate) => candidate.name === name);
+    if (!entry) throw new Error('test ZIP entry not found: ' + name);
+    view.setUint32(
+      entry.centralHeaderOffset + 38,
+      view.getUint32(entry.centralHeaderOffset + 38, true) | 0x02,
+      true
+    );
+  });
+}
+
 function insertGapBeforeCentralDirectory(archive: Uint8Array): Uint8Array {
   const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
   let eocdOffset = -1;
@@ -371,6 +392,14 @@ describe('curriculum ZIP import', () => {
       reason: 'unsupported_archive'
     });
     expect(await importCurriculumZip(setEntryDosReparsePoint(original, 'lesson.md'), manifest)).toMatchObject({
+      ok: false,
+      reason: 'unsupported_archive'
+    });
+    expect(await importCurriculumZip(setEntryUnixExecutable(original, 'lesson.md'), manifest)).toMatchObject({
+      ok: false,
+      reason: 'unsupported_archive'
+    });
+    expect(await importCurriculumZip(setEntryDosHidden(original, 'lesson.md'), manifest)).toMatchObject({
       ok: false,
       reason: 'unsupported_archive'
     });
