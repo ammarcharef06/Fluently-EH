@@ -228,6 +228,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@fluently/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       lucide-react:
         specifier: 0.468.0
         version: 0.468.0(react@19.3.1)
