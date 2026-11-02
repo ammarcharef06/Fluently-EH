@@ -10,10 +10,10 @@
   },
   "dependencies": {
     "@fluently/content-schema": "workspace:*",
+    "fflate": "0.8.3",
     "jose": "6.0.10",
     "postgres": "3.4.5",
-    "zod": "4.6.7",
-    "fflate": "0.8.3"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "wrangler": "4.156.0"
