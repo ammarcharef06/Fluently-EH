@@ -391,7 +391,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   return <div className="empty-state"><div><BookOpen size={23} /></div><strong>{title}</strong><p>{text}</p></div>;
 }
 
-function ChoiceActivity({ step, objectiveId, onAttempt, onComplete, t }: { step: Extract<Lesson['steps'][number], { type: 'choice' }>; objectiveId: string; onAttempt: (correct: boolean) => void; onComplete: () => void; t: Record<string, string> }) {
+function ChoiceActivity({ step, objectiveId, onAttempt, onComplete, t }: { step: Extract<Lesson['steps'][number], { type: 'choice' }>; objectiveId: string; onAttempt: (correct: boolean) => void; onComplete: () => void; t: Record<TranslationKey, string> }) {
   const [selected, setSelected] = useState('');
   const [feedback, setFeedback] = useState<{ correct: boolean; text: string } | null>(null);
   function check() {
