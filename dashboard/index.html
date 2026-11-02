@@ -1,205 +1,87 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fluently-EH | لوحة المتابعة الحية</title>
     <style>
+        /* إعدادات الألوان والوضع الليلي/النهاري */
         :root {
-            --bg: #0f172a;
-            --card-bg: #1e293b;
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
-            --primary: #3b82f6;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --border: #334155;
-            --live-green: #22c55e;
-            --offline-red: #ef4444;
-            --pending-yellow: #eab308;
+            --bg: #0f172a; --card-bg: #1e293b; --text: #f8fafc; --text-muted: #94a3b8;
+            --primary: #3b82f6; --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+            --border: #334155; --live-green: #22c55e; --offline-red: #ef4444;
+        }
+        [data-theme="light"] {
+            --bg: #f1f5f9; --card-bg: #ffffff; --text: #0f172a; --text-muted: #64748b;
+            --primary: #2563eb; --success: #059669; --warning: #d97706; --danger: #dc2626;
+            --border: #cbd5e1; --live-green: #16a34a; --offline-red: #dc2626;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; transition: background 0.3s, color 0.3s; }
+        .container { max-width: 1000px; margin: 0 auto; }
 
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-            padding: 2rem;
-        }
+        /* الشريط العلوي */
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        header h1 { font-size: 1.8rem; color: var(--primary); }
+        
+        .controls { display: flex; align-items: center; gap: 1rem; }
+        .icon-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 0.5rem; border-radius: 8px; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
+        .icon-btn:hover { background: var(--border); }
+        .icon-btn.spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        header h1 {
-            font-size: 2rem;
-            color: var(--primary);
-        }
-
-        /* مؤشر الحالة الحية */
-        .live-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            padding: 0.5rem 1rem;
-            border-radius: 50px;
-            font-size: 0.9rem;
-            font-weight: bold;
-        }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background-color: var(--pending-yellow);
-            box-shadow: 0 0 8px var(--pending-yellow);
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .status-dot.live {
-            background-color: var(--live-green);
-            box-shadow: 0 0 12px var(--live-green);
-            animation: pulse 2s infinite;
-        }
-
-        .status-dot.offline {
-            background-color: var(--offline-red);
-            box-shadow: 0 0 12px var(--offline-red);
-            animation: none;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
-        }
+        /* مؤشر الحالة */
+        .live-indicator { display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); border: 1px solid var(--border); padding: 0.4rem 1rem; border-radius: 50px; font-size: 0.85rem; font-weight: bold; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: var(--warning); transition: 0.3s; }
+        .status-dot.live { background-color: var(--live-green); box-shadow: 0 0 10px var(--live-green); animation: pulse 2s infinite; }
+        .status-dot.offline { background-color: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
         /* القواعد الحمراء */
-        .rules-box {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--danger);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 2rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            justify-content: center;
-        }
+        .rules-box { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); border-radius: 8px; padding: 1rem; margin-bottom: 2rem; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+        .rule { font-size: 0.85rem; font-weight: bold; color: var(--danger); }
 
-        .rule {
-            font-size: 0.9rem;
-            font-weight: bold;
-            color: #fca5a5;
-        }
+        /* الشبكة الحية (إحصائيات) */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; text-align: center; }
+        .stat-card h3 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--text); }
 
-        /* شبكة المعلومات الحية */
-        .live-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
+        /* بطاقات النشر */
+        .deploy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+        .deploy-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; }
+        .deploy-card h3 { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .deploy-value { font-size: 1.2rem; font-weight: bold; }
+        .text-success { color: var(--success); } .text-danger { color: var(--danger); } .text-warning { color: var(--warning); }
 
-        .live-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-        }
-
-        .live-card h3 {
-            font-size: 1rem;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-        }
-
-        .live-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--text);
-        }
-
-        .live-value.status-success { color: var(--success); }
-        .live-value.status-failure { color: var(--danger); }
-        .live-value.status-pending { color: var(--warning); }
-
-        .live-detail {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: 0.5rem;
-            word-break: break-all;
-        }
-
-        /* الخط الزمني للمراحل */
-        .timeline {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .phase-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: transform 0.2s ease;
-        }
-
-        .phase-card:hover {
-            transform: translateX(-5px);
-        }
-
-        .phase-info h3 {
-            font-size: 1.2rem;
-            margin-bottom: 0.3rem;
-        }
-
-        .phase-info p {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        .status {
-            padding: 0.4rem 1rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            white-space: nowrap;
-        }
-
-        .status.done { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid var(--success); }
-        .status.active { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 1px solid var(--warning); }
+        /* الخط الزمني */
+        .timeline { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+        .phase-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .phase-card:hover { transform: translateX(-5px); border-color: var(--primary); }
+        .phase-info h3 { font-size: 1.1rem; margin-bottom: 0.2rem; }
+        .phase-info p { font-size: 0.85rem; color: var(--text-muted); }
+        .status { padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: bold; white-space: nowrap; }
+        .status.done { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid var(--success); }
+        .status.active { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid var(--warning); }
         .status.pending { background: rgba(148, 163, 184, 0.1); color: var(--text-muted); border: 1px solid var(--border); }
         .status.delayed { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); }
 
-        footer {
-            text-align: center;
-            margin-top: 3rem;
-            color: var(--text-muted);
-            font-size: 0.9rem;
+        /* سجل التغييرات (Commits) */
+        .commits-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; }
+        .commits-section h2 { font-size: 1.1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+        .commit-item { display: flex; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+        .commit-item:last-child { border-bottom: none; }
+        .commit-sha { font-family: monospace; color: var(--primary); font-weight: bold; }
+        .commit-msg { color: var(--text); flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .commit-date { color: var(--text-muted); font-size: 0.75rem; }
+
+        footer { text-align: center; margin-top: 2rem; color: var(--text-muted); font-size: 0.8rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+        
+        @media (max-width: 768px) {
+            .deploy-grid { grid-template-columns: 1fr; }
+            .phase-card { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+            .commit-msg { white-space: normal; }
         }
     </style>
 </head>
@@ -207,10 +89,17 @@
 
 <div class="container">
     <header>
-        <h1>Fluently-EH</h1>
-        <div class="live-indicator">
-            <div class="status-dot" id="status-dot"></div>
-            <span id="status-text">جارٍ الاتصال بـ GitHub...</span>
+        <div>
+            <h1>Fluently-EH</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">لوحة المتابعة الحية للمشروع</p>
+        </div>
+        <div class="controls">
+            <div class="live-indicator">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">جارٍ الاتصال...</span>
+            </div>
+            <button class="icon-btn" id="theme-btn" title="تغيير المظهر">🌙</button>
+            <button class="icon-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
         </div>
     </header>
 
@@ -222,240 +111,256 @@
         <span class="rule">✅ يعمل دون اتصال</span>
     </div>
 
-    <!-- بيانات حية من GitHub -->
-    <div class="live-grid">
-        <div class="live-card">
-            <h3>آخر حالة نشر (Deployment)</h3>
-            <div class="live-value" id="deploy-status">—</div>
-            <div class="live-detail" id="deploy-detail">جارٍ الجلب...</div>
+    <!-- إحصائيات المستودع -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>النجوم (Stars)</h3>
+            <div class="stat-value" id="stat-stars">-</div>
         </div>
-        <div class="live-card">
-            <h3>آخر سير عمل (Workflow)</h3>
-            <div class="live-value" id="workflow-status">—</div>
-            <div class="live-detail" id="workflow-detail">جارٍ الجلب...</div>
+        <div class="stat-card">
+            <h3>التفرعات (Forks)</h3>
+            <div class="stat-value" id="stat-forks">-</div>
         </div>
-        <div class="live-card">
-            <h3>آخر تحديث برمجي</h3>
-            <div class="live-value" id="commit-status">—</div>
-            <div class="live-detail" id="commit-detail">جارٍ الجلب...</div>
+        <div class="stat-card">
+            <h3>المشاكل المفتوحة</h3>
+            <div class="stat-value" id="stat-issues">-</div>
+        </div>
+    </div>
+
+    <!-- بيانات CI والنشر -->
+    <div class="deploy-grid">
+        <div class="deploy-card">
+            <h3>آخر سير عمل (CI/CD)</h3>
+            <div class="deploy-value" id="ci-status">جارٍ الجلب...</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;" id="ci-name"></div>
+        </div>
+        <div class="deploy-card">
+            <h3>حالة النشر (GitHub Pages)</h3>
+            <div class="deploy-value" id="pages-status">جارٍ الجلب...</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;" id="pages-link"></div>
         </div>
     </div>
 
     <!-- الخط الزمني للمراحل -->
-    <div class="timeline">
+    <h2 style="font-size: 1.2rem; margin-bottom: 1rem;">الخط الزمني للمراحل</h2>
+    <div class="timeline" id="timeline">
         <div class="phase-card">
-            <div class="phase-info">
-                <h3>المرحلة 0: التوثيق والتخطيط</h3>
-                <p>PRD, ARCHITECTURE, DECISIONS, ROADMAP</p>
-            </div>
-            <span class="status done">مكتمل 100%</span>
+            <div class="phase-info"><h3>المرحلة 0: التوثيق</h3><p>PRD, ARCHITECTURE, DECISIONS</p></div>
+            <span class="status pending" id="phase_0">جارٍ التحميل</span>
         </div>
         <div class="phase-card">
-            <div class="phase-info">
-                <h3>المرحلة 1: إثبات الجدوى</h3>
-                <p>H2a (بناء APK): نجح البناء / H4: معلق / H2b: مؤجل</p>
-            </div>
-            <span class="status active">قيد التشخيص</span>
+            <div class="phase-info"><h3>المرحلة 1: إثبات الجدوى</h3><p>H2a, H2b, H4</p></div>
+            <span class="status pending" id="phase_1">جارٍ التحميل</span>
         </div>
         <div class="phase-card">
-            <div class="phase-info">
-                <h3>المرحلة 2: أساس المستودع</h3>
-                <p>Monorepo, Package.json, TypeScript</p>
-            </div>
-            <span class="status pending">لم يبدأ</span>
+            <div class="phase-info"><h3>المرحلة 2: أساس المستودع</h3><p>Monorepo & Packages</p></div>
+            <span class="status pending" id="phase_2">جارٍ التحميل</span>
         </div>
         <div class="phase-card">
-            <div class="phase-info">
-                <h3>المرحلة 3: محرك المنهج</h3>
-                <p>Curriculum Engine & Content Schema</p>
-            </div>
-            <span class="status pending">لم يبدأ</span>
+            <div class="phase-info"><h3>المرحلة 3: محرك المنهج</h3><p>Curriculum Engine</p></div>
+            <span class="status pending" id="phase_3">جارٍ التحميل</span>
         </div>
         <div class="phase-card">
-            <div class="phase-info">
-                <h3>المرحلة 4: محرك التقييم</h3>
-                <p>Assessment Engine & Mastery</p>
-            </div>
-            <span class="status pending">لم يبدأ</span>
+            <div class="phase-info"><h3>المرحلة 4: محرك التقييم</h3><p>Assessment Engine</p></div>
+            <span class="status pending" id="phase_4">جارٍ التحميل</span>
         </div>
         <div class="phase-card">
-            <div class="phase-info">
-                <h3>المرحلة 5: الواجهات (Web/App)</h3>
-                <p>React, Capacitor, Tauri</p>
-            </div>
-            <span class="status pending">لم يبدأ</span>
+            <div class="phase-info"><h3>المرحلة 5: الواجهات</h3><p>Web / Android / Windows</p></div>
+            <span class="status pending" id="phase_5">جارٍ التحميل</span>
         </div>
         <div class="phase-card">
-            <div class="phase-info">
-                <h3>المراحل 6 - 11: الإدارة والمحتوى والإطلاق</h3>
-                <p>محرر المحتوى، توليد الصوت، الاختبارات، الإصدار النهائي</p>
-            </div>
-            <span class="status pending">لم يبدأ</span>
+            <div class="phase-info"><h3>المرحلة 6+: الإطلاق</h3><p>المحتوى والاختبارات النهائية</p></div>
+            <span class="status pending" id="phase_6">جارٍ التحميل</span>
         </div>
     </div>
 
+    <!-- سجل التغييرات -->
+    <div class="commits-section">
+        <h2>آخر التحديثات البرمجية (Commits)</h2>
+        <div id="commit-list">جارٍ الجلب...</div>
+    </div>
+
     <footer>
-        <p>لوحة متابعة حية - تُحدث تلقائياً كل 60 ثانية</p>
+        <span id="last-updated">آخر تحديث: -</span>
+        <a href="https://github.com/ammarcharef06/Fluently-EH" target="_blank" style="color: var(--primary); text-decoration: none;">عرض المستودع على GitHub ↗</a>
     </footer>
 </div>
 
 <script>
-    // إعدادات المستودع
+    // --- الإعدادات ---
     const OWNER = 'ammarcharef06';
     const REPO = 'Fluently-EH';
-    const BRANCH = 'main'; // أو 'implementation/full-build' إذا كان هذا هو الفرع النشط
+    const BRANCH = 'main'; // غيّر هذا إلى 'implementation/full-build' إذا كان الفرع النشط مختلفاً
     const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}`;
+    const CACHE_KEY = 'fluently_dashboard_cache';
 
-    // عناصر DOM
+    // --- عناصر DOM ---
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
-    const deployStatus = document.getElementById('deploy-status');
-    const deployDetail = document.getElementById('deploy-detail');
-    const workflowStatus = document.getElementById('workflow-status');
-    const workflowDetail = document.getElementById('workflow-detail');
-    const commitStatus = document.getElementById('commit-status');
-    const commitDetail = document.getElementById('commit-detail');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const themeBtn = document.getElementById('theme-btn');
+    const lastUpdatedSpan = document.getElementById('last-updated');
 
-    // دالة لتحديث مؤشر الحالة
+    // --- إدارة المظهر (Light/Dark) ---
+    const savedTheme = localStorage.getItem('fluently_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeBtn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+    themeBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('fluently_theme', newTheme);
+        themeBtn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    });
+
+    // --- دوال مساعدة ---
+    function timeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        if (seconds < 60) return 'منذ لحظات';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `منذ ${minutes} دقيقة`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `منذ ${hours} ساعة`;
+        return `منذ ${Math.floor(hours / 24)} يوم`;
+    }
+
     function setLiveStatus(isLive, message) {
         if (isLive) {
             statusDot.className = 'status-dot live';
-            statusText.textContent = message || 'متصل - بيانات حية';
+            statusText.textContent = message || 'متصل';
         } else {
             statusDot.className = 'status-dot offline';
-            statusText.textContent = message || 'غير متصل - تعذر جلب البيانات';
+            statusText.textContent = message || 'غير متصل';
         }
     }
 
-    // دالة لجلب البيانات من GitHub
-    async function fetchGitHubData() {
+    // --- جلب البيانات وتحديث الواجهة ---
+    async function fetchDashboardData(isManual = false) {
+        if (isManual) refreshBtn.classList.add('spin');
+        
         try {
-            // 1. جلب حالة النشر (Deployment) - نستخدم GitHub Pages API
-            const pagesRes = await fetch(`${API_BASE}/pages`);
-            if (pagesRes.ok) {
-                const pagesData = await pagesRes.json();
-                const pageStatus = pagesData.status; // 'built', 'building', 'errored', 'null'
-                
-                let statusTextValue = 'غير معروف';
-                let statusClass = '';
-                
-                if (pageStatus === 'built') {
-                    statusTextValue = '✅ منشور بنجاح';
-                    statusClass = 'status-success';
-                } else if (pageStatus === 'building') {
-                    statusTextValue = '⏳ جارٍ النشر...';
-                    statusClass = 'status-pending';
-                } else if (pageStatus === 'errored') {
-                    statusTextValue = '❌ فشل النشر';
-                    statusClass = 'status-failure';
-                } else {
-                    statusTextValue = 'ℹ️ لم يتم النشر بعد';
-                    statusClass = 'status-pending';
-                }
-                
-                deployStatus.textContent = statusTextValue;
-                deployStatus.className = `live-value ${statusClass}`;
-                deployDetail.textContent = pagesData.html_url || 'لا يوجد رابط';
-            } else {
-                // إذا لم تكن الصفحات مفعلة، قد يكون المستودع لا يستخدم GitHub Pages بعد
-                deployStatus.textContent = 'ℹ️ GitHub Pages غير مفعل';
-                deployStatus.className = 'live-value status-pending';
-                deployDetail.textContent = 'لم يتم العثور على بيانات النشر';
-            }
+            // إضافة طابع زمني لتجنب التخزين المؤقت للمتصفح
+            const t = Date.now();
+            
+            // جلب كل البيانات بشكل متوازٍ
+            const [repoRes, commitsRes, runsRes, pagesRes, statusRes] = await Promise.all([
+                fetch(`${API_BASE}?t=${t}`),
+                fetch(`${API_BASE}/commits?sha=${BRANCH}&per_page=5&t=${t}`),
+                fetch(`${API_BASE}/actions/runs?branch=${BRANCH}&per_page=1&t=${t}`),
+                fetch(`${API_BASE}/pages?t=${t}`),
+                fetch(`./status.json?t=${t}`)
+            ]);
 
-            // 2. جلب آخر سير عمل (Workflow Run)
-            const runsRes = await fetch(`${API_BASE}/actions/runs?branch=${BRANCH}&per_page=1`);
-            if (runsRes.ok) {
-                const runsData = await runsRes.json();
-                if (runsData.workflow_runs && runsData.workflow_runs.length > 0) {
-                    const latestRun = runsData.workflow_runs[0];
-                    const runStatus = latestRun.status;
-                    const runConclusion = latestRun.conclusion;
-                    
-                    let workflowText = 'غير معروف';
-                    let workflowClass = '';
-                    
-                    if (runStatus === 'completed') {
-                        if (runConclusion === 'success') {
-                            workflowText = '✅ نجح';
-                            workflowClass = 'status-success';
-                        } else if (runConclusion === 'failure') {
-                            workflowText = '❌ فشل';
-                            workflowClass = 'status-failure';
-                        } else if (runConclusion === 'cancelled') {
-                            workflowText = '⏹️ ألغي';
-                            workflowClass = 'status-pending';
-                        } else {
-                            workflowText = '⚠️ ' + runConclusion;
-                            workflowClass = 'status-pending';
-                        }
-                    } else if (runStatus === 'in_progress') {
-                        workflowText = '⏳ قيد التنفيذ';
-                        workflowClass = 'status-pending';
-                    } else {
-                        workflowText = '⏸️ في الانتظار';
-                        workflowClass = 'status-pending';
-                    }
-                    
-                    workflowStatus.textContent = workflowText;
-                    workflowStatus.className = `live-value ${workflowClass}`;
-                    workflowDetail.textContent = `${latestRun.name} - ${new Date(latestRun.updated_at).toLocaleString('ar-DZ')}`;
-                } else {
-                    workflowStatus.textContent = 'ℹ️ لا توجد سير عمل';
-                    workflowStatus.className = 'live-value status-pending';
-                    workflowDetail.textContent = 'لم يتم العثور على تشغيلات حديثة';
-                }
-            } else {
-                workflowStatus.textContent = '⚠️ تعذر الجلب';
-                workflowStatus.className = 'live-value status-failure';
-                workflowDetail.textContent = 'قد يكون هناك حد للطلبات';
-            }
+            const repoData = repoRes.ok ? await repoRes.json() : null;
+            const commitsData = commitsRes.ok ? await commitsRes.json() : null;
+            const runsData = runsRes.ok ? await runsRes.json() : null;
+            const pagesData = pagesRes.ok ? await pagesRes.json() : null;
+            const statusData = statusRes.ok ? await statusRes.json() : null;
 
-            // 3. جلب آخر تحديث برمجي (Commit)
-            const commitsRes = await fetch(`${API_BASE}/commits?sha=${BRANCH}&per_page=1`);
-            if (commitsRes.ok) {
-                const commitsData = await commitsRes.json();
-                if (commitsData.length > 0) {
-                    const latestCommit = commitsData[0];
-                    const commitMessage = latestCommit.commit.message.split('\n')[0];
-                    const commitDate = new Date(latestCommit.commit.author.date);
-                    
-                    commitStatus.textContent = '📝 ' + latestCommit.sha.substring(0, 7);
-                    commitStatus.className = 'live-value';
-                    commitDetail.textContent = `${commitMessage} - ${commitDate.toLocaleString('ar-DZ')}`;
-                } else {
-                    commitStatus.textContent = 'ℹ️ لا توجد تحديثات';
-                    commitDetail.textContent = 'لم يتم العثور على التزامات';
-                }
-            } else {
-                commitStatus.textContent = '⚠️ تعذر الجلب';
-                commitStatus.className = 'live-value status-failure';
-                commitDetail.textContent = 'قد يكون هناك حد للطلبات';
-            }
+            // حفظ في التخزين المؤقت
+            const cacheData = { repoData, commitsData, runsData, pagesData, statusData, timestamp: Date.now() };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
 
-            // تحديث مؤشر الحالة إلى أخضر (متصل)
+            updateUI(cacheData, false);
             setLiveStatus(true, 'متصل - بيانات حية');
-            
+
         } catch (error) {
-            console.error('خطأ في جلب البيانات:', error);
-            // تحديث مؤشر الحالة إلى أحمر (غير متصل)
-            setLiveStatus(false, 'غير متصل - فشل الاتصال بـ GitHub');
-            
-            // عرض رسالة خطأ في البطاقات
-            deployStatus.textContent = '❌ خطأ';
-            deployDetail.textContent = 'تعذر الاتصال بـ GitHub API';
-            workflowStatus.textContent = '❌ خطأ';
-            workflowDetail.textContent = 'تعذر الاتصال بـ GitHub API';
-            commitStatus.textContent = '❌ خطأ';
-            commitDetail.textContent = 'تعذر الاتصال بـ GitHub API';
+            console.error('Fetch error:', error);
+            // محاولة القراءة من التخزين المؤقت عند الفشل
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const cacheData = JSON.parse(cached);
+                updateUI(cacheData, true);
+                setLiveStatus(false, 'غير متصل - بيانات مؤرشفة');
+            } else {
+                setLiveStatus(false, 'غير متصل - لا توجد بيانات');
+            }
+        } finally {
+            if (isManual) setTimeout(() => refreshBtn.classList.remove('spin'), 500);
         }
     }
 
-    // تشغيل الجلب فور تحميل الصفحة
-    fetchGitHubData();
+    // --- تحديث واجهة المستخدم ---
+    function updateUI(data, isOffline) {
+        // 1. الإحصائيات
+        if (data.repoData) {
+            document.getElementById('stat-stars').textContent = data.repoData.stargazers_count;
+            document.getElementById('stat-forks').textContent = data.repoData.forks_count;
+            document.getElementById('stat-issues').textContent = data.repoData.open_issues_count;
+        }
 
-    // تحديث البيانات كل 60 ثانية (60000 مللي ثانية)
-    setInterval(fetchGitHubData, 60000);
+        // 2. الـ CI
+        const ciEl = document.getElementById('ci-status');
+        const ciNameEl = document.getElementById('ci-name');
+        if (data.runsData && data.runsData.workflow_runs && data.runsData.workflow_runs.length > 0) {
+            const run = data.runsData.workflow_runs[0];
+            if (run.status === 'completed') {
+                if (run.conclusion === 'success') { ciEl.textContent = '✅ نجح'; ciEl.className = 'deploy-value text-success'; }
+                else if (run.conclusion === 'failure') { ciEl.textContent = '❌ فشل'; ciEl.className = 'deploy-value text-danger'; }
+                else { ciEl.textContent = '⏹️ ' + run.conclusion; ciEl.className = 'deploy-value text-warning'; }
+            } else {
+                ciEl.textContent = '⏳ قيد التنفيذ'; ciEl.className = 'deploy-value text-warning';
+            }
+            ciNameEl.textContent = `${run.name} - ${timeAgo(run.updated_at)}`;
+        } else {
+            ciEl.textContent = 'ℹ️ لا توجد بيانات'; ciEl.className = 'deploy-value';
+        }
+
+        // 3. حالة النشر
+        const pagesEl = document.getElementById('pages-status');
+        const pagesLinkEl = document.getElementById('pages-link');
+        if (data.pagesData) {
+            if (data.pagesData.status === 'built') {
+                pagesEl.textContent = '✅ منشور'; pagesEl.className = 'deploy-value text-success';
+                pagesLinkEl.innerHTML = `<a href="${data.pagesData.html_url}" target="_blank" style="color:var(--primary);">زيارة الموقع ↗</a>`;
+            } else if (data.pagesData.status === 'building') {
+                pagesEl.textContent = '⏳ جارٍ النشر'; pagesEl.className = 'deploy-value text-warning';
+            } else if (data.pagesData.status === 'errored') {
+                pagesEl.textContent = '❌ فشل'; pagesEl.className = 'deploy-value text-danger';
+            } else {
+                pagesEl.textContent = 'ℹ️ غير مفعل'; pagesEl.className = 'deploy-value';
+            }
+        }
+
+        // 4. الخط الزمني (من status.json)
+        if (data.statusData) {
+            for (let i = 0; i <= 6; i++) {
+                const phaseKey = `phase_${i}`;
+                const el = document.getElementById(phaseKey);
+                if (el && data.statusData[phaseKey]) {
+                    const pData = data.statusData[phaseKey];
+                    el.textContent = pData.text;
+                    el.className = `status ${pData.status}`;
+                }
+            }
+        }
+
+        // 5. سجل الـ Commits
+        const commitList = document.getElementById('commit-list');
+        if (data.commitsData && data.commitsData.length > 0) {
+            commitList.innerHTML = data.commitsData.map(commit => `
+                <div class="commit-item">
+                    <span class="commit-sha">${commit.sha.substring(0, 7)}</span>
+                    <span class="commit-msg" title="${commit.commit.message}">${commit.commit.message.split('\n')[0]}</span>
+                    <span class="commit-date">${timeAgo(commit.commit.author.date)}</span>
+                </div>
+            `).join('');
+        } else {
+            commitList.textContent = 'لا توجد تحديثات.';
+        }
+
+        // 6. وقت آخر تحديث
+        const timestamp = isOffline ? data.timestamp : Date.now();
+        lastUpdatedSpan.textContent = `آخر تحديث: ${timeAgo(new Date(timestamp).toISOString())} ${isOffline ? '(مؤرشف)' : ''}`;
+    }
+
+    // --- بدء التشغيل ---
+    refreshBtn.addEventListener('click', () => fetchDashboardData(true));
+    fetchDashboardData();
+    setInterval(() => fetchDashboardData(), 300000); // تحديث تلقائي كل 5 دقائق
 </script>
 
 </body>
