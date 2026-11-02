@@ -126,14 +126,14 @@ describe('learner web localization', () => {
     fireEvent.click(screen.getByRole('button', { name: 'تحقق من الإجابة' }));
 
     expect(await screen.findByText('هذه ليست الإجابة المطلوبة. She تعني هي عند الحديث عن مؤنث مفرد.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'التالي' })).toBeDisabled();
+    expect((screen.getByRole('button', { name: 'التالي' }) as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: 'She' }));
     fireEvent.click(screen.getByRole('button', { name: 'تحقق من الإجابة' }));
 
     expect(await screen.findByText('She تعني هي عند الحديث عن مؤنث مفرد.')).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'التالي' })).toBeEnabled();
+      expect((screen.getByRole('button', { name: 'التالي' }) as HTMLButtonElement).disabled).toBe(false);
       expect(storage.saveLessonProgress).toHaveBeenCalled();
       expect(storage.enqueueOperation).toHaveBeenCalled();
     });
