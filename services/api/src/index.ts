@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { LessonSchema } from '@fluently/content-schema';
+import { LessonSchema, validateCurriculumManifest } from '@fluently/content-schema';
+import { decodeCurriculumFilePath } from './curriculum-files';
 import { authenticateRequest, hasRole } from './auth';
 import { getDatabase } from './db';
 import type { AdminRole, AuthenticatedUser, Env } from './types';
@@ -175,6 +176,60 @@ async function getReleaseObject(env: Env, request: Request, key: 'manifest.json'
   }
 }
 
+async function getReleaseFile(env: Env, filePath: string): Promise<Response> {
+  if (!env.CURRICULUM_BUCKET) return json({ error: 'curriculum_storage_not_configured' }, 503);
+
+  let sql;
+  try {
+    sql = getDatabase(env);
+  } catch {
+    return json({ error: 'database_not_configured' }, 503);
+  }
+
+  try {
+    const releases = await sql.unsafe(
+      "select id from curriculum_releases where package_id='fluently.core' and status='published' order by published_at desc limit 1"
+    );
+    const release = releases[0] as { id: string } | undefined;
+    if (!release) return json({ error: 'no_published_curriculum' }, 404);
+
+    const manifestObject = await env.CURRICULUM_BUCKET.get('published/' + release.id + '/manifest.json');
+    if (!manifestObject) return json({ error: 'published_curriculum_manifest_missing' }, 503);
+
+    let manifestInput: unknown;
+    try {
+      manifestInput = JSON.parse(await new Response(manifestObject.body).text()) as unknown;
+    } catch {
+      return json({ error: 'published_curriculum_manifest_invalid' }, 503);
+    }
+
+    const validation = validateCurriculumManifest(manifestInput);
+    if (!validation.ok) return json({ error: 'published_curriculum_manifest_invalid' }, 503);
+
+    const entry = validation.manifest.files.find((file) => file.path === filePath);
+    if (!entry) return json({ error: 'curriculum_file_not_declared' }, 404);
+
+    const object = await env.CURRICULUM_BUCKET.get('published/' + release.id + '/' + filePath);
+    if (!object) return json({ error: 'published_curriculum_object_missing' }, 503);
+    if (object.size !== entry.bytes) return json({ error: 'published_curriculum_file_size_mismatch' }, 503);
+
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream',
+        'Cache-Control': 'private, max-age=60',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'same-origin',
+        ETag: object.httpEtag,
+        Vary: 'Cookie, Authorization'
+      }
+    });
+  } catch {
+    return json({ error: 'curriculum_file_query_failed' }, 503);
+  } finally {
+    await sql.end({ timeout: 1 });
+  }
+}
+
 async function handleRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -211,6 +266,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   const exportMatch = path === '/v1/me/export';
   const curriculumManifest = path === '/v1/curriculum/manifest';
   const curriculumContent = path === '/v1/curriculum/content.json';
+  const curriculumFilesPrefix = '/v1/curriculum/files/';
+  const curriculumFileRequest = path.startsWith(curriculumFilesPrefix);
   const syncPush = path === '/v1/sync/push';
   const adminSession = path === '/v1/admin/session';
   const adminDrafts = path === '/v1/admin/drafts';
@@ -344,6 +401,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
   if (curriculumManifest && method === 'GET') return getReleaseObject(env, request, 'manifest.json');
   if (curriculumContent && method === 'GET') return getReleaseObject(env, request, 'content.json');
+  if (curriculumFileRequest && method === 'GET') {
+    const filePath = decodeCurriculumFilePath(path.slice(curriculumFilesPrefix.length));
+    if (!filePath) return json({ error: 'invalid_curriculum_file_path' }, 400);
+    return getReleaseFile(env, filePath);
+  }
 
   if (adminSession && method === 'GET') {
     if (!requireRole(user, 'owner', 'editor', 'reviewer', 'publisher')) return json({ error: 'forbidden' }, 403);
