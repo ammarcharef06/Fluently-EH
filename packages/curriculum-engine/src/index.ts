@@ -80,7 +80,7 @@ function makeIssue(
  */
 export function compileCurriculumIndex(input: readonly unknown[]): CurriculumCompilation {
   const issues: CurriculumIssue[] = [];
-  const parsedLessons: Lesson[] = [];
+  const parsedLessons: Array<{ lesson: Lesson; inputIndex: number }> = [];
 
   input.forEach((candidate, inputIndex) => {
     const parsed = LessonSchema.safeParse(candidate);
@@ -102,17 +102,13 @@ export function compileCurriculumIndex(input: readonly unknown[]): CurriculumCom
       ));
       return;
     }
-    parsedLessons.push(parsed.data);
+    parsedLessons.push({ lesson: parsed.data, inputIndex });
   });
 
   const lessonById = new Map<string, Lesson>();
   const inputIndexById = new Map<string, number>();
 
-  parsedLessons.forEach((lesson) => {
-    const inputIndex = input.findIndex((candidate) =>
-      typeof candidate === 'object' && candidate !== null &&
-      'id' in candidate && candidate.id === lesson.id
-    );
+  parsedLessons.forEach(({ lesson, inputIndex }) => {
     if (lessonById.has(lesson.id)) {
       issues.push(makeIssue(
         'duplicate_lesson_id',
