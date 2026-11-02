@@ -56,19 +56,28 @@ export async function preflightCurriculumStorage(
   return { ok: true, requiredBytes, availableBytes };
 }
 
+export type CurriculumDownloadProgress = { receivedBytes: number; totalBytes: number | null };
+
 export async function readBoundedResponse(
   response: Response,
-  maxBytes: number
+  maxBytes: number,
+  onProgress?: (receivedBytes: number, totalBytes: number | null) => void
 ): Promise<Uint8Array | null> {
   const contentLengthHeader = response.headers.get('Content-Length');
+  let declaredTotalBytes: number | null = null;
   if (contentLengthHeader) {
     const contentLength = Number(contentLengthHeader);
-    if (Number.isFinite(contentLength) && contentLength > maxBytes) return null;
+    if (Number.isFinite(contentLength) && contentLength >= 0) {
+      declaredTotalBytes = contentLength;
+      if (contentLength > maxBytes) return null;
+    }
   }
 
   if (!response.body) {
     const bytes = new Uint8Array(await response.arrayBuffer());
-    return bytes.byteLength <= maxBytes ? bytes : null;
+    if (bytes.byteLength > maxBytes) return null;
+    onProgress?.(bytes.byteLength, declaredTotalBytes ?? bytes.byteLength);
+    return bytes;
   }
 
   const reader = response.body.getReader();
@@ -84,6 +93,7 @@ export async function readBoundedResponse(
         return null;
       }
       chunks.push(result.value);
+      onProgress?.(totalBytes, declaredTotalBytes);
     }
   } finally {
     reader.releaseLock();
@@ -95,6 +105,7 @@ export async function readBoundedResponse(
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
+  onProgress?.(totalBytes, declaredTotalBytes ?? totalBytes);
   return bytes;
 }
 
@@ -165,7 +176,10 @@ export async function readActiveCurriculumPackage(packageId: string): Promise<{
   return { package: packageRecord, files };
 }
 
-export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<DownloadResult> {
+export async function downloadAndActivateCurriculum(
+  apiBase = '/api',
+  options: { onProgress?: (progress: CurriculumDownloadProgress) => void } = {}
+): Promise<DownloadResult> {
   const base = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
   try {
     const manifestResponse = await fetch(base + '/v1/curriculum/manifest', {
@@ -195,6 +209,8 @@ export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<D
     const storage = await preflightCurriculumStorage(requiredBytes);
     if (!storage.ok) return storage;
     const files = new Map<string, Uint8Array>();
+    const totalPackageBytes = requiredBytes;
+    let completedBytes = 0;
 
     for (const entry of manifest.files) {
       const encodedPath = entry.path.split('/').map(encodeURIComponent).join('/');
@@ -212,11 +228,18 @@ export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<D
       if (response.status === 404) return { ok: false, reason: 'not_found' };
       if (!response.ok) return { ok: false, reason: 'provider_unavailable' };
 
-      const bytes = await readBoundedResponse(response, entry.bytes);
+      const bytes = await readBoundedResponse(response, entry.bytes, (receivedBytes) => {
+        options.onProgress?.({
+          receivedBytes: Math.min(totalPackageBytes, completedBytes + receivedBytes),
+          totalBytes: totalPackageBytes
+        });
+      });
       if (!bytes || bytes.byteLength !== entry.bytes) {
         return { ok: false, reason: 'integrity_failed' };
       }
       files.set(entry.path, bytes);
+      completedBytes += bytes.byteLength;
+      options.onProgress?.({ receivedBytes: completedBytes, totalBytes: totalPackageBytes });
     }
 
     const activated = await activateCurriculumPackage(manifest, files);

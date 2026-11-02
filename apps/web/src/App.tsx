@@ -45,6 +45,7 @@ function App() {
   const [demoNotice, setDemoNotice] = useState(true);
   const [isPersistent, setIsPersistent] = useState<boolean | null>(null);
   const [storageQuotaFailure, setStorageQuotaFailure] = useState<{ requiredBytes: number; availableBytes: number } | null>(null);
+  const [curriculumDownloadProgress, setCurriculumDownloadProgress] = useState<{ receivedBytes: number; totalBytes: number | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,7 +147,10 @@ function App() {
         const localReady = await loadLocalPackage();
         if (!localReady) {
           setStorageQuotaFailure(null);
-          const downloaded = await downloadAndActivateCurriculumZip();
+          setCurriculumDownloadProgress({ receivedBytes: 0, totalBytes: null });
+          const downloaded = await downloadAndActivateCurriculumZip('/api', {
+            onProgress: setCurriculumDownloadProgress
+          });
           if (downloaded.ok) {
             await loadLocalPackage();
           } else if (downloaded.reason === 'storage_quota_insufficient') {
@@ -156,7 +160,9 @@ function App() {
             });
           } else if (downloaded.reason === 'archive_unavailable') {
             // Older releases may still expose the manifest-declared file transport.
-            const legacyDownload = await downloadAndActivateCurriculum();
+            const legacyDownload = await downloadAndActivateCurriculum('/api', {
+              onProgress: setCurriculumDownloadProgress
+            });
             if (legacyDownload.ok) {
               await loadLocalPackage();
             } else if (legacyDownload.reason === 'storage_quota_insufficient') {
@@ -166,6 +172,7 @@ function App() {
               });
             }
           }
+          setCurriculumDownloadProgress(null);
         }
         return;
       }
@@ -334,6 +341,8 @@ function App() {
         {DEMO_ENABLED && demoNotice && <div className="demo-banner"><Sparkles size={17} /><span>{t.demo}</span><button aria-label={t.close} onClick={() => setDemoNotice(false)}><X size={17} /></button></div>}
 
         {storageQuotaFailure && <div className="auth-warning" role="alert"><ShieldCheck size={20} /><div><strong>{t.curriculumStorageInsufficientTitle}</strong><span>{translate('curriculumStorageInsufficientText', locale, { available: formatBytes(storageQuotaFailure.availableBytes), required: formatBytes(storageQuotaFailure.requiredBytes) })}</span></div></div>}
+
+        {curriculumDownloadProgress && <div className="curriculum-download-progress" role="status" aria-live="polite"><div className="curriculum-download-progress__row"><strong>{t.curriculumDownloadProgress}</strong><span>{formatBytes(curriculumDownloadProgress.receivedBytes)}{curriculumDownloadProgress.totalBytes !== null ? ' / ' + formatBytes(curriculumDownloadProgress.totalBytes) : ''}</span></div><progress max={100} value={curriculumDownloadProgress.totalBytes !== null && curriculumDownloadProgress.totalBytes > 0 ? Math.min(100, (curriculumDownloadProgress.receivedBytes / curriculumDownloadProgress.totalBytes) * 100) : undefined} aria-label={t.curriculumDownloadProgress} /></div>}
 
         {screen === 'home' && (
           <>

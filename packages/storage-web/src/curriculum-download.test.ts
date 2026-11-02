@@ -44,19 +44,26 @@ describe('first-run ZIP curriculum download', () => {
     const content = new TextEncoder().encode('{"lessons":[]}');
     const manifest = await manifestFor(packageId, '1.0.0', content);
     const archive = archiveFor(manifest, content);
+    const progress: Array<{ receivedBytes: number; totalBytes: number | null }> = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith('/v1/curriculum/manifest')) return jsonResponse(manifest);
       if (url.endsWith('/v1/curriculum/package.zip')) {
-        return new Response(archive, { headers: { 'Content-Type': 'application/zip' } });
+        return new Response(archive, {
+          headers: {
+            'Content-Type': 'application/zip',
+            'Content-Length': String(archive.byteLength)
+          }
+        });
       }
       return new Response('not found', { status: 404 });
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await downloadAndActivateCurriculumZip('/api');
+    const result = await downloadAndActivateCurriculumZip('/api', { onProgress: (item) => progress.push(item) });
 
     expect(result.ok).toBe(true);
+    expect(progress.at(-1)).toEqual({ receivedBytes: archive.byteLength, totalBytes: archive.byteLength });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       '/api/v1/curriculum/manifest',
