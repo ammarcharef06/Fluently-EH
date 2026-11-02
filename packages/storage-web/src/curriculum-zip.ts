@@ -1,4 +1,4 @@
-import { Unzip, UnzipInflate } from 'fflate';
+import { Unzip, UnzipInflate, UnzipPassThrough } from 'fflate';
 import {
   isSafePackagePath,
   MAX_FILE_COUNT,
@@ -542,6 +542,7 @@ function inflateZipEntries(archive: Uint8Array, entries: readonly ZipEntry[]): M
     }
   });
 
+  unzip.register(UnzipPassThrough);
   unzip.register(UnzipInflate);
   try {
     for (let offset = 0; offset < archive.byteLength; offset += ZIP_INPUT_CHUNK_BYTES) {
