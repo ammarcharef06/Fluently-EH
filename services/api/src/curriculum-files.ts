@@ -24,7 +24,6 @@ export function decodeCurriculumFilePath(encodedPath: string): string | null {
       segment === '..' ||
       segment.includes('/') ||
       segment.includes('\\') ||
-      /[\u0000-\u001f\u007f]/.test(segment)
     ) return null;
 
     decodedSegments.push(segment);
