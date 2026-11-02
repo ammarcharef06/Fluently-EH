@@ -1,6 +1,6 @@
 import { validateCurriculumManifest, type CurriculumManifest } from '@fluently/content-schema';
 import { importCurriculumZip, MAX_CURRICULUM_ZIP_BYTES } from './curriculum-zip';
-import { activateCurriculumPackage, readBoundedResponse } from './curriculum';
+import { readBoundedResponse } from './curriculum';
 
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 
@@ -77,7 +77,3 @@ export async function downloadAndActivateCurriculumZip(apiBase = '/api'): Promis
     return { ok: false, reason: 'provider_unavailable' };
   }
 }
-
-// Keep this import visible to TypeScript consumers that need explicit activation
-// semantics while avoiding a second storage implementation.
-export { activateCurriculumPackage };
