@@ -449,9 +449,11 @@ export function evaluatePlacement(
       const itemCount = stageItems.filter((item) => item.skill === skill).length;
       const threshold = calibration.thresholdsByStageSkill[stage]?.[skill];
       const minimumResponses = calibration.minimumResponsesByStageSkill[stage]?.[skill];
+      const minimumDistinctContexts = calibration.minimumDistinctContextsByStageSkill[stage]?.[skill];
       if (
         !isValidThreshold(threshold) ||
-        !isValidResponseCount(minimumResponses, itemCount)
+        !isValidResponseCount(minimumResponses, itemCount) ||
+        !isValidResponseCount(minimumDistinctContexts, itemCount)
       ) {
         missingConfiguration.add(skill);
       }
@@ -503,8 +505,10 @@ export function evaluatePlacement(
       const itemIdsForSkill = new Set(itemsForSkill.map((item) => item.id));
       const answers = relevant.filter((response) => itemIdsForSkill.has(response.itemId));
       const minimumResponses = calibration.minimumResponsesByStageSkill[stage]?.[skill] as number;
+      const minimumDistinctContexts = calibration.minimumDistinctContextsByStageSkill[stage]?.[skill] as number;
+      const distinctContexts = new Set(answers.map((response) => response.contextId));
 
-      if (answers.length < minimumResponses) {
+      if (answers.length < minimumResponses || distinctContexts.size < minimumDistinctContexts) {
         missingEvidence.add(skill);
         continue;
       }
