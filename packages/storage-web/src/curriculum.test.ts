@@ -70,11 +70,16 @@ describe('atomic curriculum activation', () => {
       return new Response('not found', { status: 404 });
     });
     vi.stubGlobal('fetch', fetchMock);
+    const progress: Array<{ receivedBytes: number; totalBytes: number | null }> = [];
 
-    const result = await downloadAndActivateCurriculum('/api');
+    const result = await downloadAndActivateCurriculum('/api', { onProgress: (item) => progress.push(item) });
 
     expect(result.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(progress.at(-1)).toEqual({
+      receivedBytes: content.byteLength + lesson.byteLength,
+      totalBytes: content.byteLength + lesson.byteLength
+    });
     const stored = await readActiveCurriculumPackage(packageId);
     expect(new TextDecoder().decode(stored?.files.get('content.json'))).toBe('{"lessons":[]}');
     expect(new TextDecoder().decode(stored?.files.get('lessons/unit-1/lesson.md'))).toBe('# A reviewed lesson');
