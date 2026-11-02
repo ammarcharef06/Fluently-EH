@@ -123,7 +123,7 @@ describe('first-run ZIP curriculum download', () => {
     expect(stored?.package.contentVersion).toBe('1.0.0');
     expect(new TextDecoder().decode(stored?.files.get('content.json'))).toBe('active package v1');
   });
-  
+
   it('stops before fetching the ZIP when the browser quota estimate is insufficient', async () => {
     const packageId = 'fluently.test.quota.' + crypto.randomUUID();
     const content = new TextEncoder().encode('{"lessons":[]}');
