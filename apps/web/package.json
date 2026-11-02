@@ -9,10 +9,11 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@fluently/domain": "workspace:*",
-    "@fluently/storage-web": "workspace:*",
-    "@fluently/curriculum": "workspace:*",
     "@fluently/content-schema": "workspace:*",
+    "@fluently/curriculum": "workspace:*",
+    "@fluently/domain": "workspace:*",
+    "@fluently/i18n": "workspace:*",
+    "@fluently/storage-web": "workspace:*",
     "lucide-react": "0.468.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
