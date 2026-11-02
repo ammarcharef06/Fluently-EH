@@ -1,10 +1,14 @@
 import 'fake-indexeddb/auto';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   activateCurriculumPackage,
   downloadAndActivateCurriculum,
   readActiveCurriculumPackage
 } from './curriculum';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes);
