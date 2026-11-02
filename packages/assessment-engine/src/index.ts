@@ -351,6 +351,7 @@ export type CalibrationApproval = {
   approvedAt: string;
   thresholdsByStageSkill: Partial<Record<LearningStage, Partial<Record<AssessmentSkill, number>>>>;
   minimumResponsesByStageSkill: Partial<Record<LearningStage, Partial<Record<AssessmentSkill, number>>>>;
+  minimumDistinctContextsByStageSkill: Partial<Record<LearningStage, Partial<Record<AssessmentSkill, number>>>>;
 };
 
 export type PlacementBlueprint = {
