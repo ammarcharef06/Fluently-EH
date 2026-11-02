@@ -36,7 +36,7 @@ describe('API defaults', () => {
     const body = await response.json() as { error: string };
     expect(body.error).toBe('identity_provider_not_configured');
   });
-  
+
   it('keeps the curriculum ZIP endpoint behind authentication', async () => {
     const response = await worker.fetch(new Request(
       'https://api.fluently.test/v1/curriculum/package.zip'
