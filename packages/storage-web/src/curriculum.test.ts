@@ -131,4 +131,24 @@ describe('atomic curriculum activation', () => {
     expect(result).toEqual({ ok: false, reason: 'invalid_manifest' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('stops an oversized file stream before activating the package', async () => {
+    const packageId = 'fluently.test.oversized.' + crypto.randomUUID();
+    const expected = new TextEncoder().encode('tiny');
+    const manifest = await packageManifest(packageId, '1.0.0', [
+      { path: 'content.json', bytes: expected }
+    ]);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/v1/curriculum/manifest')) {
+        return new Response(JSON.stringify(manifest));
+      }
+      return new Response('this response is longer than the manifest permits');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await downloadAndActivateCurriculum('/api');
+
+    expect(result).toEqual({ ok: false, reason: 'integrity_failed' });
+    expect(await readActiveCurriculumPackage(packageId)).toBeNull();
+  });
 });
