@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./sync": "./src/sync.ts",
     "./curriculum": "./src/curriculum.ts",
-    "./curriculum-zip": "./src/curriculum-zip.ts"
+    "./curriculum-zip": "./src/curriculum-zip.ts",
+    "./curriculum-download": "./src/curriculum-download.ts"
   },
   "dependencies": {
     "@fluently/content-schema": "workspace:*",
