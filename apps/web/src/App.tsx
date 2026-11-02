@@ -24,6 +24,11 @@ import { syncPendingOperations } from '@fluently/storage-web/sync';
 type Screen = 'home' | 'path' | 'lesson' | 'review' | 'settings';
 const DEMO_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO !== 'false';
 
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return Math.ceil(bytes / 1024) + ' KB';
+}
+
 function App() {
   const [signedIn, setSignedIn] = useState(DEMO_ENABLED);
   const [screen, setScreen] = useState<Screen>('home');
@@ -39,6 +44,7 @@ function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [demoNotice, setDemoNotice] = useState(true);
   const [isPersistent, setIsPersistent] = useState<boolean | null>(null);
+  const [storageQuotaFailure, setStorageQuotaFailure] = useState<{ requiredBytes: number; availableBytes: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +131,7 @@ function App() {
           const validLessons = validated.flatMap((result) => result.success ? [result.data] : []);
           if (cancelled) return false;
           setServerLessons(validLessons);
+          setStorageQuotaFailure(null);
           return validLessons.length > 0;
         } catch {
           return false;
@@ -138,13 +145,26 @@ function App() {
         setSignedIn(true);
         const localReady = await loadLocalPackage();
         if (!localReady) {
+          setStorageQuotaFailure(null);
           const downloaded = await downloadAndActivateCurriculumZip();
           if (downloaded.ok) {
             await loadLocalPackage();
+          } else if (downloaded.reason === 'storage_quota_insufficient') {
+            setStorageQuotaFailure({
+              requiredBytes: downloaded.requiredBytes,
+              availableBytes: downloaded.availableBytes
+            });
           } else if (downloaded.reason === 'archive_unavailable') {
             // Older releases may still expose the manifest-declared file transport.
             const legacyDownload = await downloadAndActivateCurriculum();
-            if (legacyDownload.ok) await loadLocalPackage();
+            if (legacyDownload.ok) {
+              await loadLocalPackage();
+            } else if (legacyDownload.reason === 'storage_quota_insufficient') {
+              setStorageQuotaFailure({
+                requiredBytes: legacyDownload.requiredBytes,
+                availableBytes: legacyDownload.availableBytes
+              });
+            }
           }
         }
         return;
@@ -312,6 +332,8 @@ function App() {
         </header>
 
         {DEMO_ENABLED && demoNotice && <div className="demo-banner"><Sparkles size={17} /><span>{t.demo}</span><button aria-label={t.close} onClick={() => setDemoNotice(false)}><X size={17} /></button></div>}
+
+        {storageQuotaFailure && <div className="auth-warning" role="alert"><ShieldCheck size={20} /><div><strong>{t.curriculumStorageInsufficientTitle}</strong><span>{translate('curriculumStorageInsufficientText', locale, { available: formatBytes(storageQuotaFailure.availableBytes), required: formatBytes(storageQuotaFailure.requiredBytes) })}</span></div></div>}
 
         {screen === 'home' && (
           <>
