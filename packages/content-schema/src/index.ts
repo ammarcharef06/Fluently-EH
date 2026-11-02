@@ -51,7 +51,7 @@ export function isSafePackagePath(path: string): boolean {
     path.startsWith('/') ||
     path.startsWith('\\') ||
     path.includes('\\') ||
-    hasControlCharacters(path).test(path)
+    hasControlCharacters(path)
   ) return false;
 
   return path.split('/').every((segment) =>
