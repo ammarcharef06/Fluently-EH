@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
-import { strToU8, zipSync } from 'fflate';
+import { strToU8, Zip, ZipDeflate, zipSync } from 'fflate';
 import { readActiveCurriculumPackage } from './curriculum';
 import { importCurriculumZip, importCurriculumZipBlob, MAX_CURRICULUM_ZIP_BYTES } from './curriculum-zip';
 
@@ -40,6 +40,41 @@ function createZip(embeddedManifest: unknown, files: PackageFiles, level = 6): U
   };
   for (const [path, bytes] of Object.entries(files)) entries[path] = bytes;
   return zipSync(entries, { level });
+}
+
+function createStreamingZip(embeddedManifest: unknown, files: PackageFiles): Promise<Uint8Array> {
+  const entries: PackageFiles = {
+    'manifest.json': strToU8(JSON.stringify(embeddedManifest)),
+    ...files
+  };
+
+  return new Promise((resolve, reject) => {
+    const chunks: Uint8Array[] = [];
+    const zip = new Zip((error, chunk, final) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      if (chunk) chunks.push(chunk.slice());
+      if (!final) return;
+
+      const totalBytes = chunks.reduce((total, part) => total + part.byteLength, 0);
+      const archive = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const part of chunks) {
+        archive.set(part, offset);
+        offset += part.byteLength;
+      }
+      resolve(archive);
+    });
+
+    for (const [path, bytes] of Object.entries(entries)) {
+      const file = new ZipDeflate(path, { level: 6 });
+      zip.add(file);
+      file.push(bytes, true);
+    }
+    zip.end();
+  });
 }
 
 function directoryEntryOffsets(archive: Uint8Array): Array<{
@@ -196,6 +231,27 @@ describe('curriculum ZIP import', () => {
     expect(result).toEqual({ ok: true, manifest });
     const stored = await readActiveCurriculumPackage(packageId);
     expect(new TextDecoder().decode(stored?.files.get('lessons/first.md'))).toBe('# Stored lesson');
+  });
+
+  it('imports streaming ZIP entries with data descriptors', async () => {
+    const packageId = 'fluently.test.zip.descriptor.' + crypto.randomUUID();
+    const files: PackageFiles = {
+      'content.json': strToU8('{"lessons":[]}'),
+      'lessons/streamed.md': strToU8('# Streamed lesson')
+    };
+    const manifest = await createManifest(packageId, files);
+    const archive = await createStreamingZip(manifest, files);
+    const entries = directoryEntryOffsets(archive);
+    const contentEntry = entries.find((entry) => entry.name === 'content.json');
+    expect(contentEntry).toBeTruthy();
+    const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+    expect(view.getUint16(contentEntry!.localHeaderOffset + 6, true) & 0x0008).toBe(0x0008);
+
+    const result = await importCurriculumZip(archive, manifest);
+
+    expect(result).toEqual({ ok: true, manifest });
+    const stored = await readActiveCurriculumPackage(packageId);
+    expect(new TextDecoder().decode(stored?.files.get('lessons/streamed.md'))).toBe('# Streamed lesson');
   });
 
   it('rejects an embedded manifest that differs from the trusted manifest without activation', async () => {
