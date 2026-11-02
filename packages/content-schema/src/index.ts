@@ -38,13 +38,20 @@ export const MAX_PACKAGE_BYTES = 250 * 1024 * 1024;
 export const MAX_FILE_COUNT = 5000;
 export const MAX_SINGLE_FILE_BYTES = 100 * 1024 * 1024;
 
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.charCodeAt(0);
+    return codePoint < 0x20 || codePoint === 0x7f;
+  });
+}
+
 export function isSafePackagePath(path: string): boolean {
   if (
     !path ||
     path.startsWith('/') ||
     path.startsWith('\\') ||
     path.includes('\\') ||
-    /[\u0000-\u001f\u007f]/.test(path)
+    hasControlCharacters(path).test(path)
   ) return false;
 
   return path.split('/').every((segment) =>
