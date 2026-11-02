@@ -73,8 +73,20 @@ export async function activateCurriculumPackage(
   const verified = await verifyPackageFiles(manifestInput, files);
   if (!verified.ok) return verified;
 
-  const db = await openFluentlyDB();
   const manifest = verified.manifest;
+  const verifiedFiles: Array<{
+    path: string;
+    sha256: string;
+    source: Uint8Array;
+  }> = [];
+
+  for (const entry of manifest.files) {
+    const source = files.get(entry.path);
+    if (!source) return { ok: false, errors: ['Missing file after integrity verification: ' + entry.path] };
+    verifiedFiles.push({ path: entry.path, sha256: entry.sha256, source });
+  }
+
+  const db = await openFluentlyDB();
   const tx = db.transaction(['curriculumPackages', 'curriculumFiles'], 'readwrite');
   const fileStore = tx.objectStore('curriculumFiles');
   const existing = await fileStore.getAll();
@@ -82,13 +94,8 @@ export async function activateCurriculumPackage(
     if (item.packageId === manifest.packageId) await fileStore.delete(item.id);
   }
 
-  for (const entry of manifest.files) {
-    const bytes = files.get(entry.path);
-    if (!bytes) {
-      tx.abort();
-      return { ok: false, errors: ['Missing file after integrity verification: ' + entry.path] };
-    }
-    const copy = bytes.slice();
+  for (const entry of verifiedFiles) {
+    const copy = entry.source.slice();
     await fileStore.put({
       id: manifest.packageId + ':' + entry.path,
       packageId: manifest.packageId,
