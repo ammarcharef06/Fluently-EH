@@ -297,7 +297,7 @@ function App() {
         <header className="topbar">
           <div><span className="breadcrumb">{screen === 'home' ? t.home : screen === 'path' ? t.path : screen === 'review' ? t.review : screen === 'settings' ? t.settings : t.library}</span></div>
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')} title={t.language}>{locale === 'ar' ? 'EN' : 'عربي'}</button>
+            <button className="icon-button" onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')} title={t.language}>{locale === 'ar' ? t.englishLanguage : t.arabicLanguage}</button>
             <button className="icon-button" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} title={theme === 'light' ? t.dark : t.light}>{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>
             <div className="avatar avatar-small">F</div>
           </div>
@@ -383,7 +383,7 @@ function App() {
   );
 }
 
-function LessonList({ lessons, openLesson, t }: { lessons: Lesson[]; openLesson: (lesson: Lesson) => void; t: Record<string, string> }) {
+function LessonList({ lessons, openLesson, t }: { lessons: Lesson[]; openLesson: (lesson: Lesson) => void; t: Record<TranslationKey, string> }) {
   return <div className="lesson-list">{lessons.map((lesson) => <article className="lesson-row" key={lesson.id}><div className="lesson-row-icon"><BookOpen size={19} /></div><div className="lesson-row-copy"><strong>{lesson.title}</strong><span>{lesson.description}</span><small>{lesson.estimatedMinutes} {t.minutesShort} · {t.draft}</small></div><button className="round-action" aria-label={t.next} onClick={() => openLesson(lesson)}><Play size={17} /></button></article>)}</div>;
 }
 
