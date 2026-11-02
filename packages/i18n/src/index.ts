@@ -129,7 +129,7 @@ const arabicMessages = {
   adminStatusOffline: 'الخدمة غير متاحة أو لا يوجد اتصال',
   adminServerContentHeading: 'المحتوى من الخادم',
   adminRoleMatrixHeading: 'مصفوفة الأدوار',
-  adminInvitePolicy: 'إنشاء حسابات الموظفين يتم بدعوة المدير الرئيسي بعد تهيئة مزود الهوية.'
+  adminInvitePolicy: 'إنشاء حسابات الموظفين يتم بدعوة المدير الرئيسي بعد تهيئة مزود الهوية.',
   noMicrophone: 'لا يستخدم التطبيق الميكروفون ولا يقيّم صوت المتعلم.'
 } as const;
 
@@ -258,7 +258,7 @@ const englishMessages: Record<TranslationKey, string> = {
   adminStatusOffline: 'Service unavailable or offline',
   adminServerContentHeading: 'Content from server',
   adminRoleMatrixHeading: 'Role matrix',
-  adminInvitePolicy: 'Staff accounts are created by an invitation from the primary administrator after the identity provider is configured.'
+  adminInvitePolicy: 'Staff accounts are created by an invitation from the primary administrator after the identity provider is configured.',
   noMicrophone: 'The app does not request microphone access or score learner speech.'
 };
 
