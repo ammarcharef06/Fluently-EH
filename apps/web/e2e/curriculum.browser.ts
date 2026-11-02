@@ -101,6 +101,12 @@ test('downloads a trusted curriculum ZIP and keeps the lesson available after go
   await page.evaluate(async () => {
     if ('serviceWorker' in navigator) await navigator.serviceWorker.ready;
   });
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+
+  // The first navigation may have happened before the service worker controlled the page.
+  // Reload online once so the worker can cache the production shell and its static assets.
+  await page.reload();
+  await expect(page.getByText(fixture.lesson.title, { exact: true })).toBeVisible({ timeout: 10_000 });
 
   await page.route('**/api/**', (route) => route.abort());
   await context.setOffline(true);
