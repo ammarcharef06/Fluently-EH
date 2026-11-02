@@ -349,8 +349,8 @@ export type CalibrationApproval = {
   sampleSize: number;
   approvedBy: string;
   approvedAt: string;
-  thresholds: Partial<Record<AssessmentSkill, number>>;
-  minimumResponsesBySkill: Partial<Record<AssessmentSkill, number>>;
+  thresholdsByStageSkill: Partial<Record<LearningStage, Partial<Record<AssessmentSkill, number>>>>;
+  minimumResponsesByStageSkill: Partial<Record<LearningStage, Partial<Record<AssessmentSkill, number>>>>;
 };
 
 export type PlacementBlueprint = {
@@ -360,19 +360,33 @@ export type PlacementBlueprint = {
   calibration: CalibrationApproval | null;
 };
 
+export type StageSkillRates = Partial<Record<LearningStage, Partial<Record<AssessmentSkill, number>>>>;
+
 export type PlacementResult =
   | { status: 'calibration_required'; blueprintVersion: string; missingSkills: AssessmentSkill[] }
   | { status: 'insufficient_evidence'; blueprintVersion: string; missingSkills: AssessmentSkill[] }
+  | {
+      status: 'below_placement_range';
+      blueprintVersion: string;
+      skillRates: Partial<Record<AssessmentSkill, number>>;
+      stageSkillRates: StageSkillRates;
+      evidenceCount: number;
+    }
   | {
       status: 'placed';
       blueprintVersion: string;
       recommendedStage: LearningStage;
       skillRates: Partial<Record<AssessmentSkill, number>>;
+      stageSkillRates: StageSkillRates;
       evidenceCount: number;
     };
 
 function validatePlacementItems(blueprint: PlacementBlueprint): AssessmentSkill[] {
   assertNonEmpty(blueprint.version, 'Placement blueprint version');
+  if (blueprint.status !== 'draft' && blueprint.status !== 'calibrated') {
+    throw new TypeError('Placement blueprint status is not supported.');
+  }
+
   const itemIds = new Set<string>();
   for (const item of blueprint.items) {
     assertNonEmpty(item.id, 'Placement item id');
@@ -392,6 +406,17 @@ function validatePlacementItems(blueprint: PlacementBlueprint): AssessmentSkill[
   return [...new Set(blueprint.items.map((item) => item.skill))];
 }
 
+function isValidThreshold(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+function isValidResponseCount(value: unknown, maximum: number): value is number {
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value > 0 &&
+    value <= maximum;
+}
+
 export function evaluatePlacement(
   blueprint: PlacementBlueprint,
   responses: readonly PlacementResponse[]
@@ -400,12 +425,14 @@ export function evaluatePlacement(
   if (skills.length === 0) {
     return { status: 'calibration_required', blueprintVersion: blueprint.version, missingSkills: [] };
   }
-  const calibration = blueprint.calibration;
 
+  const stages = LEARNING_STAGES.filter((stage) => blueprint.items.some((item) => item.stage === stage));
+  const calibration = blueprint.calibration;
   if (
     blueprint.status !== 'calibrated' ||
     !calibration ||
     calibration.blueprintVersion !== blueprint.version ||
+    typeof calibration.approvedBy !== 'string' ||
     calibration.approvedBy.trim().length === 0 ||
     !Number.isFinite(Date.parse(calibration.approvedAt)) ||
     !Number.isInteger(calibration.sampleSize) ||
@@ -414,84 +441,135 @@ export function evaluatePlacement(
     return { status: 'calibration_required', blueprintVersion: blueprint.version, missingSkills: skills };
   }
 
-  const missingConfiguration = skills.filter((skill) => {
-    const threshold = calibration.thresholds[skill];
-    const minimumResponses = calibration.minimumResponsesBySkill[skill];
-    return (
-      typeof threshold !== 'number' ||
-      !Number.isFinite(threshold) ||
-      threshold < 0 ||
-      threshold > 1 ||
-      typeof minimumResponses !== 'number' ||
-      !Number.isInteger(minimumResponses) ||
-      minimumResponses <= 0 ||
-      minimumResponses > blueprint.items.filter((item) => item.skill === skill).length
-    );
-  });
+  const missingConfiguration = new Set<AssessmentSkill>();
+  for (const stage of stages) {
+    const stageItems = blueprint.items.filter((item) => item.stage === stage);
+    const stageSkills = [...new Set(stageItems.map((item) => item.skill))];
+    for (const skill of stageSkills) {
+      const itemCount = stageItems.filter((item) => item.skill === skill).length;
+      const threshold = calibration.thresholdsByStageSkill[stage]?.[skill];
+      const minimumResponses = calibration.minimumResponsesByStageSkill[stage]?.[skill];
+      if (
+        !isValidThreshold(threshold) ||
+        !isValidResponseCount(minimumResponses, itemCount)
+      ) {
+        missingConfiguration.add(skill);
+      }
+    }
+  }
 
-  if (missingConfiguration.length > 0) {
+  if (missingConfiguration.size > 0) {
     return {
       status: 'calibration_required',
       blueprintVersion: blueprint.version,
-      missingSkills: missingConfiguration
+      missingSkills: [...missingConfiguration]
     };
   }
 
   const itemById = new Map(blueprint.items.map((item) => [item.id, item]));
-  const seen = new Set<string>();
-  const relevant = responses.filter((response) => {
+  const latestResponseByItem = new Map<string, PlacementResponse>();
+
+  for (const response of responses) {
     const item = itemById.get(response.itemId);
-    if (!item || seen.has(response.itemId)) return false;
-    if (item.skill !== response.skill || item.objectiveId !== response.objectiveId) return false;
-    if (typeof response.correct !== 'boolean' || response.contextId.trim().length === 0) return false;
-    if (!Number.isFinite(Date.parse(response.answeredAt))) return false;
-    seen.add(response.itemId);
-    return true;
-  });
-
-  const rates: Partial<Record<AssessmentSkill, number>> = {};
-  const missingEvidence: AssessmentSkill[] = [];
-
-  for (const skill of skills) {
-    const items = blueprint.items.filter((item) => item.skill === skill);
-    const answers = relevant.filter((response) => response.skill === skill);
-    const minimumResponses = calibration.minimumResponsesBySkill[skill] as number;
-
-    if (answers.length < minimumResponses) {
-      missingEvidence.push(skill);
+    if (
+      !item ||
+      item.skill !== response.skill ||
+      item.objectiveId !== response.objectiveId ||
+      typeof response.correct !== 'boolean' ||
+      typeof response.contextId !== 'string' ||
+      response.contextId.trim().length === 0 ||
+      !Number.isFinite(Date.parse(response.answeredAt))
+    ) {
       continue;
     }
 
-    const itemWeights = new Map(items.map((item) => [item.id, item.weight]));
+    const previous = latestResponseByItem.get(response.itemId);
+    if (!previous || Date.parse(response.answeredAt) >= Date.parse(previous.answeredAt)) {
+      latestResponseByItem.set(response.itemId, response);
+    }
+  }
+
+  const relevant = [...latestResponseByItem.values()];
+  const missingEvidence = new Set<AssessmentSkill>();
+  const stageSkillRates: StageSkillRates = {};
+
+  for (const stage of stages) {
+    const stageItems = blueprint.items.filter((item) => item.stage === stage);
+    const stageSkills = [...new Set(stageItems.map((item) => item.skill))];
+    const ratesForStage: Partial<Record<AssessmentSkill, number>> = {};
+
+    for (const skill of stageSkills) {
+      const itemsForSkill = stageItems.filter((item) => item.skill === skill);
+      const itemIdsForSkill = new Set(itemsForSkill.map((item) => item.id));
+      const answers = relevant.filter((response) => itemIdsForSkill.has(response.itemId));
+      const minimumResponses = calibration.minimumResponsesByStageSkill[stage]?.[skill] as number;
+
+      if (answers.length < minimumResponses) {
+        missingEvidence.add(skill);
+        continue;
+      }
+
+      const itemWeights = new Map(itemsForSkill.map((item) => [item.id, item.weight]));
+      const achieved = answers.reduce(
+        (sum, response) => sum + (response.correct ? (itemWeights.get(response.itemId) ?? 0) : 0),
+        0
+      );
+      const possible = answers.reduce((sum, response) => sum + (itemWeights.get(response.itemId) ?? 0), 0);
+      ratesForStage[skill] = possible === 0 ? 0 : achieved / possible;
+    }
+
+    stageSkillRates[stage] = ratesForStage;
+  }
+
+  if (missingEvidence.size > 0) {
+    return {
+      status: 'insufficient_evidence',
+      blueprintVersion: blueprint.version,
+      missingSkills: [...missingEvidence]
+    };
+  }
+
+  const skillRates: Partial<Record<AssessmentSkill, number>> = {};
+  for (const skill of skills) {
+    const skillItems = blueprint.items.filter((item) => item.skill === skill);
+    const itemWeights = new Map(skillItems.map((item) => [item.id, item.weight]));
+    const answers = relevant.filter((response) => itemWeights.has(response.itemId));
     const achieved = answers.reduce(
       (sum, response) => sum + (response.correct ? (itemWeights.get(response.itemId) ?? 0) : 0),
       0
     );
     const possible = answers.reduce((sum, response) => sum + (itemWeights.get(response.itemId) ?? 0), 0);
-    rates[skill] = possible === 0 ? 0 : achieved / possible;
+    skillRates[skill] = possible === 0 ? 0 : achieved / possible;
   }
 
-  if (missingEvidence.length > 0) {
+  let recommendedStage: LearningStage | null = null;
+  for (const stage of stages) {
+    const stageSkills = [...new Set(blueprint.items.filter((item) => item.stage === stage).map((item) => item.skill))];
+    const passed = stageSkills.every((skill) => {
+      const rate = stageSkillRates[stage]?.[skill];
+      const threshold = calibration.thresholdsByStageSkill[stage]?.[skill];
+      return typeof rate === 'number' && typeof threshold === 'number' && rate >= threshold;
+    });
+    if (!passed) break;
+    recommendedStage = stage;
+  }
+
+  if (recommendedStage === null) {
     return {
-      status: 'insufficient_evidence',
+      status: 'below_placement_range',
       blueprintVersion: blueprint.version,
-      missingSkills: missingEvidence
+      skillRates,
+      stageSkillRates,
+      evidenceCount: relevant.length
     };
   }
 
-  const passedStages = LEARNING_STAGES.filter((stage) => {
-    const stageItems = blueprint.items.filter((item) => item.stage === stage);
-    if (stageItems.length === 0) return false;
-    const stageSkills = [...new Set(stageItems.map((item) => item.skill))];
-    return stageSkills.every((skill) => (rates[skill] ?? 0) >= (calibration.thresholds[skill] as number));
-  });
-
-  const recommendedStage = passedStages.at(-1) ?? LEARNING_STAGES[0];
   return {
     status: 'placed',
     blueprintVersion: blueprint.version,
     recommendedStage,
-    skillRates: rates,
+    skillRates,
+    stageSkillRates,
     evidenceCount: relevant.length
   };
 }
