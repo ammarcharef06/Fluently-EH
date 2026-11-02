@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
 
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const packageManager = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 const commands = [
-  { name: 'api', args: ['run', 'dev:api'] },
-  { name: 'web', args: ['run', 'dev:web'] }
+  { name: 'api', args: ['--filter', '@fluently/api', 'dev'] },
+  { name: 'web', args: ['--filter', '@fluently/web', 'dev'] }
 ];
 const children = [];
 let shuttingDown = false;
@@ -18,7 +18,7 @@ function stopAll(exitCode = 0) {
 }
 
 for (const command of commands) {
-  const child = spawn(npm, command.args, {
+  const child = spawn(packageManager, command.args, {
     stdio: 'inherit',
     env: { ...process.env, FORCE_COLOR: '1' }
   });
