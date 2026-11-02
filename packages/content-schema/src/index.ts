@@ -40,8 +40,8 @@ export const MAX_SINGLE_FILE_BYTES = 100 * 1024 * 1024;
 
 function hasControlCharacters(value: string): boolean {
   return Array.from(value).some((character) => {
-    const codePoint = character.charCodeAt(0);
-    return codePoint < 0x20 || codePoint === 0x7f;
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint < 0x20 || (codePoint >= 0x7f && codePoint <= 0x9f);
   });
 }
 
@@ -54,11 +54,15 @@ export function isSafePackagePath(path: string): boolean {
     hasControlCharacters(path)
   ) return false;
 
+  const windowsDeviceName = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i;
   return path.split('/').every((segment) =>
     segment.length > 0 &&
     segment !== '.' &&
     segment !== '..' &&
-    !/^[A-Za-z]:/.test(segment)
+    !/^[A-Za-z]:/.test(segment) &&
+    !/[<>:"|?*]/.test(segment) &&
+    !/[. ]$/.test(segment) &&
+    !windowsDeviceName.test(segment)
   );
 }
 
