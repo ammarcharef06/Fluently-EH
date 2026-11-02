@@ -20,7 +20,7 @@ const DATA_DESCRIPTOR_FLAG = 0x0008;
 const ZIP64_UNSUPPORTED_SENTINEL_16 = 0xffff;
 const ZIP64_UNSUPPORTED_SENTINEL_32 = 0xffffffff;
 const MAX_ZIP_MANIFEST_BYTES = 2 * 1024 * 1024;
-const MAX_ZIP_ARCHIVE_BYTES = MAX_PACKAGE_BYTES + MAX_ZIP_MANIFEST_BYTES;
+export const MAX_CURRICULUM_ZIP_BYTES = MAX_PACKAGE_BYTES + MAX_ZIP_MANIFEST_BYTES;
 const ZIP_INPUT_CHUNK_BYTES = 64 * 1024;
 const ROOT_MANIFEST_PATH = 'manifest.json';
 const ALLOWED_GENERAL_PURPOSE_FLAGS = UTF8_FILENAME_FLAG | DATA_DESCRIPTOR_FLAG | 0x0006;
@@ -200,7 +200,7 @@ function parseDataDescriptor(
 }
 
 function parseZipEntries(archive: Uint8Array): ZipEntry[] {
-  if (archive.byteLength > MAX_ZIP_ARCHIVE_BYTES) {
+  if (archive.byteLength > MAX_CURRICULUM_ZIP_BYTES) {
     fail('archive_too_large', 'The ZIP archive exceeds the configured size limit.');
   }
   if (archive.byteLength < 22) fail('invalid_archive', 'The ZIP archive is too small.');
@@ -629,6 +629,36 @@ export async function importCurriculumZip(
       ok: false,
       reason: 'invalid_archive',
       errors: ['The ZIP archive could not be parsed safely.']
+    };
+  }
+}
+
+/**
+ * Checks the Blob size before allocating its backing ArrayBuffer.
+ * Callers should use this entry point for browser File objects.
+ */
+export async function importCurriculumZipBlob(
+  archive: Blob,
+  trustedManifestInput: unknown
+): Promise<ZipImportResult> {
+  if (archive.size > MAX_CURRICULUM_ZIP_BYTES) {
+    return {
+      ok: false,
+      reason: 'archive_too_large',
+      errors: ['The ZIP archive exceeds the configured size limit.']
+    };
+  }
+
+  try {
+    return await importCurriculumZip(
+      new Uint8Array(await archive.arrayBuffer()),
+      trustedManifestInput
+    );
+  } catch {
+    return {
+      ok: false,
+      reason: 'invalid_archive',
+      errors: ['The ZIP file could not be read.']
     };
   }
 }
