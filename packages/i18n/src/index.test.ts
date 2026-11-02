@@ -58,4 +58,9 @@ describe('translation catalog', () => {
   it('keeps missing interpolation placeholders visible', () => {
     expect(t('stepProgress', 'en', { current: 2 })).toBe('Step 2 of {total}');
   });
+
+  it('interpolates learner review labels in both locales', () => {
+    expect(t('dueReviewsAvailable', 'ar', { count: 2 })).toBe('لديك مراجعات مستحقة: 2.');
+    expect(t('spacedReviewInterval', 'en', { days: 3 })).toBe('Spaced review · 3 days');
+  });
 });
