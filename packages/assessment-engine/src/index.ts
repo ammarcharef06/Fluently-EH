@@ -100,9 +100,9 @@ function assertAttempt(attempt: AttemptResult): void {
 /**
  * Evaluates configured mastery rules without supplying product defaults.
  *
- * Each question ID contributes at most one unit to the question count,
- * success count, and correct-rate denominator, regardless of retry count.
- * Context diversity is counted independently from the retained attempt log.
+ * Only the latest attempt for each question ID contributes evidence.
+ * Retries therefore cannot inflate question, context, success, or rate counts,
+ * and a later incorrect retry can no longer be masked by an earlier success.
  */
 export function evaluateMastery(
   attempts: readonly AttemptResult[],
@@ -111,18 +111,23 @@ export function evaluateMastery(
   assertMasteryRule(rule);
 
   const relevant = attempts.filter((item) => item.objectiveId === rule.objectiveId);
-  const questions = new Set<string>();
-  const successfulQuestions = new Set<string>();
-  const contexts = new Set<string>();
+  const latestAttemptByQuestion = new Map<string, AttemptResult>();
 
   for (const attempt of relevant) {
     assertAttempt(attempt);
-    questions.add(attempt.questionId);
-    contexts.add(attempt.contextId);
-    if (attempt.correct) successfulQuestions.add(attempt.questionId);
+    const previous = latestAttemptByQuestion.get(attempt.questionId);
+    if (
+      !previous ||
+      Date.parse(attempt.attemptedAt) >= Date.parse(previous.attemptedAt)
+    ) {
+      latestAttemptByQuestion.set(attempt.questionId, attempt);
+    }
   }
 
-  const successfulAttempts = successfulQuestions.size;
+  const latestAttempts = [...latestAttemptByQuestion.values()];
+  const questions = new Set(latestAttempts.map((attempt) => attempt.questionId));
+  const contexts = new Set(latestAttempts.map((attempt) => attempt.contextId));
+  const successfulAttempts = latestAttempts.filter((attempt) => attempt.correct).length;
   const correctRate = questions.size === 0 ? 0 : successfulAttempts / questions.size;
   const reasons: string[] = [];
 
@@ -372,6 +377,12 @@ function validatePlacementItems(blueprint: PlacementBlueprint): AssessmentSkill[
   for (const item of blueprint.items) {
     assertNonEmpty(item.id, 'Placement item id');
     assertNonEmpty(item.objectiveId, 'Placement item objectiveId');
+    if (!LEARNING_STAGES.includes(item.stage)) {
+      throw new TypeError('Placement item stage is not supported.');
+    }
+    if (!ASSESSMENT_SKILLS.includes(item.skill)) {
+      throw new TypeError('Placement item skill is not measurable.');
+    }
     if (!Number.isFinite(item.weight) || item.weight <= 0) {
       throw new RangeError('Placement item weight must be a finite positive number.');
     }
@@ -413,7 +424,8 @@ export function evaluatePlacement(
       threshold > 1 ||
       typeof minimumResponses !== 'number' ||
       !Number.isInteger(minimumResponses) ||
-      minimumResponses <= 0
+      minimumResponses <= 0 ||
+      minimumResponses > blueprint.items.filter((item) => item.skill === skill).length
     );
   });
 
