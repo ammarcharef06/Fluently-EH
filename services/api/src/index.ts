@@ -50,8 +50,6 @@ const ReviewInput = z.object({
 type SyncOperation = z.infer<typeof SyncOperationSchema>;
 type QueryResult<T> = { data?: T; error?: string };
 
-const encoder = new TextEncoder();
-
 function json(data: unknown, status = 200, extraHeaders?: HeadersInit): Response {
   const headers = new Headers(extraHeaders);
   headers.set('Content-Type', 'application/json; charset=utf-8');
