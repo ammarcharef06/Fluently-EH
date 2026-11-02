@@ -1,25 +1,17 @@
 name: Fluently CI
-
 on:
   push:
     branches:
       - implementation/full-build
-    paths-ignore:
-      - package-lock.json
   pull_request:
     branches:
       - main
       - implementation/full-build
-    paths-ignore:
-      - package-lock.json
-
 permissions:
-  contents: write
-
+  contents: read
 concurrency:
   group: fluently-ci-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   validate:
     runs-on: ubuntu-24.04
@@ -27,52 +19,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "22.16.0"
-
-      - name: Generate deterministic dependency lockfile
-        run: |
-          rm -f package-lock.json
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Install locked dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
-
+          package-manager-cache: false
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@12.16.1
+      - name: Install workspace dependencies
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
+      - name: Verify generated lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: TypeScript checks
-        run: npm run typecheck
-
+        run: pnpm run typecheck
       - name: Unit tests
-        run: npm test
-
+        run: pnpm test
       - name: Lint
-        run: npm run lint
-
+        run: pnpm lint
       - name: Secret-pattern scan
-        run: npm run security:check
-
+        run: pnpm run security:check
       - name: Dependency vulnerability audit
-        run: npm audit --audit-level=high
-
+        run: pnpm audit --audit-level high
       - name: Validate curriculum drafts
-        run: npm run content:validate
-
+        run: pnpm run content:validate
       - name: Build learner and admin applications
-        run: npm run build
-
-      - name: Commit generated lockfile on implementation branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/implementation/full-build'
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package-lock.json
-          if git diff --cached --quiet; then
-            echo 'Lockfile is unchanged.'
-            exit 0
-          fi
-          git commit -m 'chore: lock npm workspace dependencies'
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+        run: pnpm run build
