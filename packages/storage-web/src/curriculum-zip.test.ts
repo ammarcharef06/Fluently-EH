@@ -1,8 +1,8 @@
 import 'fake-indexeddb/auto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
 import { readActiveCurriculumPackage } from './curriculum';
-import { importCurriculumZip } from './curriculum-zip';
+import { importCurriculumZip, importCurriculumZipBlob, MAX_CURRICULUM_ZIP_BYTES } from './curriculum-zip';
 
 type PackageFiles = Record<string, Uint8Array>;
 
@@ -238,6 +238,21 @@ describe('curriculum ZIP import', () => {
       reason: 'invalid_archive'
     });
 
+    const collisionFiles: PackageFiles = {
+      'content.json': strToU8('{"lessons":[]}'),
+      'lesson.md': strToU8('lowercase path'),
+      'LESSON.MD': strToU8('case-colliding path')
+    };
+    const collisionPackageId = 'fluently.test.zip.collision.' + crypto.randomUUID();
+    const collisionManifest = await createManifest(collisionPackageId, {
+      'content.json': collisionFiles['content.json']!,
+      'lesson.md': collisionFiles['lesson.md']!
+    });
+    expect(await importCurriculumZip(createZip(collisionManifest, collisionFiles), collisionManifest)).toMatchObject({
+      ok: false,
+      reason: 'invalid_archive'
+    });
+
     const conflictingFiles: PackageFiles = {
       'content.json': strToU8('{"lessons":[]}'),
       'lessons': strToU8('file path'),
@@ -381,5 +396,27 @@ describe('curriculum ZIP import', () => {
       rights: []
     });
     expect(result).toMatchObject({ ok: false, reason: 'invalid_archive' });
+  });
+
+  it('rejects an oversized Blob before reading it into memory', async () => {
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(0));
+    const oversized = {
+      size: MAX_CURRICULUM_ZIP_BYTES + 1,
+      arrayBuffer
+    } as unknown as Blob;
+
+    const result = await importCurriculumZipBlob(oversized, {
+      packageId: 'unused',
+      contentVersion: '1.0.0',
+      schemaVersion: 1,
+      minAppVersion: '0.1.0',
+      maxAppVersion: null,
+      generatedAt: '2026-11-01T00:00:00.000Z',
+      files: [{ path: 'content.json', bytes: 0, sha256: '0'.repeat(64) }],
+      rights: []
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'archive_too_large' });
+    expect(arrayBuffer).not.toHaveBeenCalled();
   });
 });
