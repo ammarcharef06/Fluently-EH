@@ -48,11 +48,11 @@ describe('trusted curriculum ZIP package builder', () => {
 
     const embeddedManifest = JSON.parse(new TextDecoder().decode(entries['manifest.json']!)) as unknown;
     expect(validateCurriculumManifest(embeddedManifest).ok).toBe(true);
-    const verified = await verifyPackageFiles(embeddedManifest, new Map(
-      Object.entries(entries)
-        .filter(([path]) => path !== 'manifest.json')
-        .map(([path, bytes]) => [path, bytes])
-    ));
+    const extractedFiles = new Map<string, Uint8Array>();
+    for (const [path, bytes] of Object.entries(entries)) {
+      if (path !== 'manifest.json') extractedFiles.set(path, bytes);
+    }
+    const verified = await verifyPackageFiles(embeddedManifest, extractedFiles);
     expect(verified.ok).toBe(true);
     expect(built.contentSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(built.archiveSha256).toMatch(/^[a-f0-9]{64}$/);
