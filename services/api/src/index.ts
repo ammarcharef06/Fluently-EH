@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { LessonSchema, validateCurriculumManifest } from '@fluently/content-schema';
+import { LessonSchema, MAX_PACKAGE_BYTES, validateCurriculumManifest } from '@fluently/content-schema';
+import { buildCurriculumArchive } from './curriculum-package';
 import { decodeCurriculumFilePath } from './curriculum-files';
 import { authenticateRequest, hasRole } from './auth';
 import { getDatabase } from './db';
@@ -48,8 +49,6 @@ const ReviewInput = z.object({
 
 type SyncOperation = z.infer<typeof SyncOperationSchema>;
 type QueryResult<T> = { data?: T; error?: string };
-
-const encoder = new TextEncoder();
 
 function json(data: unknown, status = 200, extraHeaders?: HeadersInit): Response {
   const headers = new Headers(extraHeaders);
@@ -176,6 +175,46 @@ async function getReleaseObject(env: Env, request: Request, key: 'manifest.json'
   }
 }
 
+async function getReleaseArchive(env: Env): Promise<Response> {
+  if (!env.CURRICULUM_BUCKET) return json({ error: 'curriculum_storage_not_configured' }, 503);
+  let sql;
+  try {
+    sql = getDatabase(env);
+  } catch {
+    return json({ error: 'database_not_configured' }, 503);
+  }
+
+  try {
+    const releases = await sql.unsafe(
+      "select id from curriculum_releases where package_id='fluently.core' and status='published' order by published_at desc limit 1"
+    );
+    const release = releases[0] as { id: string } | undefined;
+    if (!release) return json({ error: 'no_published_curriculum' }, 404);
+    const object = await env.CURRICULUM_BUCKET.get('published/' + release.id + '/curriculum.zip');
+    if (!object) return json({ error: 'published_curriculum_archive_missing' }, 503);
+    if (object.size > MAX_PACKAGE_BYTES + 2 * 1024 * 1024) {
+      return json({ error: 'published_curriculum_archive_too_large' }, 503);
+    }
+
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Length': String(object.size),
+        'Content-Disposition': 'attachment; filename="curriculum.zip"',
+        'Cache-Control': 'private, max-age=60',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'same-origin',
+        ETag: object.httpEtag,
+        Vary: 'Cookie, Authorization'
+      }
+    });
+  } catch {
+    return json({ error: 'curriculum_archive_query_failed' }, 503);
+  } finally {
+    await sql.end({ timeout: 1 });
+  }
+}
+
 async function getReleaseFile(env: Env, filePath: string): Promise<Response> {
   if (!env.CURRICULUM_BUCKET) return json({ error: 'curriculum_storage_not_configured' }, 503);
 
@@ -266,6 +305,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   const exportMatch = path === '/v1/me/export';
   const curriculumManifest = path === '/v1/curriculum/manifest';
   const curriculumContent = path === '/v1/curriculum/content.json';
+  const curriculumZip = path === '/v1/curriculum/package.zip';
   const curriculumFilesPrefix = '/v1/curriculum/files/';
   const curriculumFileRequest = path.startsWith(curriculumFilesPrefix);
   const syncPush = path === '/v1/sync/push';
@@ -400,6 +440,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   }
 
   if (curriculumManifest && method === 'GET') return getReleaseObject(env, request, 'manifest.json');
+  if (curriculumZip && method === 'GET') return getReleaseArchive(env);
   if (curriculumContent && method === 'GET') return getReleaseFile(env, 'content.json');
   if (curriculumFileRequest && method === 'GET') {
     const filePath = decodeCurriculumFilePath(path.slice(curriculumFilesPrefix.length));
@@ -646,39 +687,44 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       if (rights.some((item) => !item.license || item.license.toLowerCase().includes('pending') || !item.attribution)) {
         return json({ error: 'missing_content_rights' }, 409);
       }
-      const payload = encoder.encode(JSON.stringify({
-        packageId: 'fluently.core',
-        contentVersion: parsed.data.contentVersion,
-        lessons
-      }, null, 2));
-      const digest = await sha256Hex(payload);
-      const manifest = {
-        packageId: 'fluently.core',
-        contentVersion: parsed.data.contentVersion,
-        schemaVersion: 1,
-        minAppVersion: '0.1.0',
-        maxAppVersion: null,
-        generatedAt: new Date().toISOString(),
-        files: [{ path: 'content.json', bytes: payload.byteLength, sha256: digest }],
-        rights
-      };
+
+      const bundle = await buildCurriculumArchive(lessons, parsed.data.contentVersion);
       const releaseId = crypto.randomUUID();
-      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/content.json', payload, {
-        httpMetadata: { contentType: 'application/json' }
+      for (const [filePath, bytes] of bundle.files) {
+        const contentType = filePath.endsWith('.json')
+          ? 'application/json; charset=utf-8'
+          : filePath.endsWith('.md')
+            ? 'text/markdown; charset=utf-8'
+            : 'application/octet-stream';
+        await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/' + filePath, bytes, {
+          httpMetadata: { contentType }
+        });
+      }
+      const manifestText = JSON.stringify(bundle.manifest);
+      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/manifest.json', manifestText, {
+        httpMetadata: { contentType: 'application/json; charset=utf-8' }
       });
-      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/manifest.json', JSON.stringify(manifest), {
-        httpMetadata: { contentType: 'application/json' }
+      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/curriculum.zip', bundle.archive, {
+        httpMetadata: { contentType: 'application/zip' }
+      });
+      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/curriculum.zip.sha256', bundle.archiveSha256, {
+        httpMetadata: { contentType: 'text/plain; charset=utf-8' }
       });
       const created = await sql.begin(async (tx) => {
         await tx.unsafe("select set_config('app.user_id', $1, true)", [user.userId]);
         const inserted = await tx.unsafe(
           "insert into curriculum_releases (id,package_id,content_version,schema_version,manifest,package_sha256,status) " +
           "values ($1,'fluently.core',$2,1,$3::jsonb,$4,'staged') returning id,content_version,status,package_sha256",
-          [releaseId, parsed.data.contentVersion, JSON.stringify(manifest), digest]
+          [releaseId, parsed.data.contentVersion, JSON.stringify(bundle.manifest), bundle.contentSha256]
         );
         await tx.unsafe(
           "insert into audit_events (actor_user_id,action,subject_id,metadata) values ($1,'curriculum.stage_release',$2,$3::jsonb)",
-          [user.userId, releaseId, JSON.stringify({ contentVersion: parsed.data.contentVersion, sha256: digest })]
+          [user.userId, releaseId, JSON.stringify({
+            contentVersion: parsed.data.contentVersion,
+            contentSha256: bundle.contentSha256,
+            archiveSha256: bundle.archiveSha256,
+            fileCount: bundle.manifest.files.length
+          })]
         );
         return inserted[0];
       });
@@ -705,19 +751,61 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         );
         const release = rows[0] as { id: string; package_id: string; content_version: string; package_sha256: string; status: string } | undefined;
         if (!release || release.status !== 'staged') return null;
-        const contentObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/content.json');
         const manifestObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/manifest.json');
-        if (!contentObject || !manifestObject) throw new Error('staged_release_files_missing');
-        const bytes = new Uint8Array(await new Response(contentObject.body).arrayBuffer());
-        if (await sha256Hex(bytes) !== release.package_sha256) throw new Error('staged_release_hash_mismatch');
+        const archiveObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/curriculum.zip');
+        const archiveHashObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/curriculum.zip.sha256');
+        if (!manifestObject || !archiveObject || !archiveHashObject) throw new Error('staged_release_files_missing');
+
         const manifestText = await new Response(manifestObject.body).text();
-        const manifest = JSON.parse(manifestText) as { files?: Array<{ sha256?: string }> };
-        if (manifest.files?.[0]?.sha256 !== release.package_sha256) throw new Error('staged_manifest_hash_mismatch');
-        await env.CURRICULUM_BUCKET!.put('published/' + release.id + '/content.json', bytes, {
-          httpMetadata: { contentType: 'application/json' }
-        });
+        const parsedManifest = JSON.parse(manifestText) as unknown;
+        const manifestValidation = validateCurriculumManifest(parsedManifest);
+        if (!manifestValidation.ok) throw new Error('staged_release_manifest_invalid');
+        const manifest = manifestValidation.manifest;
+        const files = new Map<string, Uint8Array>();
+
+        for (const entry of manifest.files) {
+          const stagedObject = await env.CURRICULUM_BUCKET!.get('staged/' + release.id + '/' + entry.path);
+          if (!stagedObject || stagedObject.size !== entry.bytes) throw new Error('staged_release_file_size_mismatch');
+          const bytes = new Uint8Array(await new Response(stagedObject.body).arrayBuffer());
+          if (bytes.byteLength !== entry.bytes || await sha256Hex(bytes) !== entry.sha256) {
+            throw new Error('staged_release_file_integrity_failed');
+          }
+          files.set(entry.path, bytes);
+        }
+
+        const contentBytes = files.get('content.json');
+        if (!contentBytes || await sha256Hex(contentBytes) !== release.package_sha256) {
+          throw new Error('staged_release_content_hash_mismatch');
+        }
+
+        if (archiveObject.size > MAX_PACKAGE_BYTES + 2 * 1024 * 1024) {
+          throw new Error('staged_release_archive_too_large');
+        }
+        const archiveBytes = new Uint8Array(await new Response(archiveObject.body).arrayBuffer());
+        const archiveHash = (await new Response(archiveHashObject.body).text()).trim();
+        if (
+          archiveBytes.byteLength > MAX_PACKAGE_BYTES + 2 * 1024 * 1024 ||
+          !/^[a-f0-9]{64}$/.test(archiveHash) ||
+          await sha256Hex(archiveBytes) !== archiveHash
+        ) {
+          throw new Error('staged_release_archive_integrity_failed');
+        }
+
+        for (const [filePath, bytes] of files) {
+          const contentType = filePath.endsWith('.json')
+            ? 'application/json; charset=utf-8'
+            : filePath.endsWith('.md')
+              ? 'text/markdown; charset=utf-8'
+              : 'application/octet-stream';
+          await env.CURRICULUM_BUCKET!.put('published/' + release.id + '/' + filePath, bytes, {
+            httpMetadata: { contentType }
+          });
+        }
         await env.CURRICULUM_BUCKET!.put('published/' + release.id + '/manifest.json', manifestText, {
-          httpMetadata: { contentType: 'application/json' }
+          httpMetadata: { contentType: 'application/json; charset=utf-8' }
+        });
+        await env.CURRICULUM_BUCKET!.put('published/' + release.id + '/curriculum.zip', archiveBytes, {
+          httpMetadata: { contentType: 'application/zip' }
         });
         await tx.unsafe(
           "update curriculum_releases set status='retired' where package_id=$1 and status='published'",

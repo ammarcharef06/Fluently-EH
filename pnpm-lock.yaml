@@ -358,6 +358,9 @@ importers:
       '@fluently/content-schema':
         specifier: workspace:*
         version: link:../../packages/content-schema
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       jose:
         specifier: 6.0.10
         version: 6.0.10
