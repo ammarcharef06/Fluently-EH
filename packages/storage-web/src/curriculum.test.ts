@@ -151,7 +151,7 @@ describe('atomic curriculum activation', () => {
     expect(result).toEqual({ ok: false, reason: 'integrity_failed' });
     expect(await readActiveCurriculumPackage(packageId)).toBeNull();
   });
-  
+
   it('preflights storage before requesting any manifest-declared file', async () => {
     const packageId = 'fluently.test.legacy-quota.' + crypto.randomUUID();
     const content = new TextEncoder().encode('{"lessons":[]}');
