@@ -372,9 +372,8 @@ function validatePlacementItems(blueprint: PlacementBlueprint): AssessmentSkill[
   for (const item of blueprint.items) {
     assertNonEmpty(item.id, 'Placement item id');
     assertNonEmpty(item.objectiveId, 'Placement item objectiveId');
-    assertPositiveInteger(item.weight, 'Placement item weight');
-    if (!Number.isFinite(item.weight)) {
-      throw new RangeError('Placement item weight must be finite.');
+    if (!Number.isFinite(item.weight) || item.weight <= 0) {
+      throw new RangeError('Placement item weight must be a finite positive number.');
     }
     if (itemIds.has(item.id)) throw new Error('Placement item IDs must be unique.');
     itemIds.add(item.id);
@@ -387,6 +386,9 @@ export function evaluatePlacement(
   responses: readonly PlacementResponse[]
 ): PlacementResult {
   const skills = validatePlacementItems(blueprint);
+  if (skills.length === 0) {
+    return { status: 'calibration_required', blueprintVersion: blueprint.version, missingSkills: [] };
+  }
   const calibration = blueprint.calibration;
 
   if (
