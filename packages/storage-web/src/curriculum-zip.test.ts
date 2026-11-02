@@ -34,12 +34,12 @@ async function createManifest(packageId: string, files: PackageFiles) {
   };
 }
 
-function createZip(embeddedManifest: unknown, files: PackageFiles): Uint8Array {
+function createZip(embeddedManifest: unknown, files: PackageFiles, level = 6): Uint8Array {
   const entries: Record<string, Uint8Array> = {
     'manifest.json': strToU8(JSON.stringify(embeddedManifest))
   };
   for (const [path, bytes] of Object.entries(files)) entries[path] = bytes;
-  return zipSync(entries, { level: 6 });
+  return zipSync(entries, { level });
 }
 
 function directoryEntryOffsets(archive: Uint8Array): Array<{
@@ -180,6 +180,22 @@ describe('curriculum ZIP import', () => {
     expect(new TextDecoder().decode(stored?.files.get('lessons/unit-1/lesson.md'))).toBe('# A reviewed lesson');
     expect(new TextDecoder().decode(stored?.files.get('media/example.txt'))).toBe('Example asset with documented rights');
     expect(stored?.files.has('manifest.json')).toBe(false);
+  });
+
+  it('imports STORE-compressed entries as well as DEFLATE entries', async () => {
+    const packageId = 'fluently.test.zip.store.' + crypto.randomUUID();
+    const files: PackageFiles = {
+      'content.json': strToU8('{"lessons":[]}'),
+      'lessons/first.md': strToU8('# Stored lesson')
+    };
+    const manifest = await createManifest(packageId, files);
+    const archive = createZip(manifest, files, 0);
+
+    const result = await importCurriculumZip(archive, manifest);
+
+    expect(result).toEqual({ ok: true, manifest });
+    const stored = await readActiveCurriculumPackage(packageId);
+    expect(new TextDecoder().decode(stored?.files.get('lessons/first.md'))).toBe('# Stored lesson');
   });
 
   it('rejects an embedded manifest that differs from the trusted manifest without activation', async () => {
