@@ -54,7 +54,7 @@ export function isSafePackagePath(path: string): boolean {
     hasControlCharacters(path)
   ) return false;
 
-  const windowsDeviceName = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\\.|$)/i;
+  const windowsDeviceName = /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i;
   return path.split('/').every((segment) =>
     segment.length > 0 &&
     segment !== '.' &&
