@@ -1,4 +1,4 @@
-import { zipSync, strToU8 } from 'fflate';
+import { zipSync } from 'fflate';
 import {
   LessonSchema,
   MAX_PACKAGE_BYTES,
