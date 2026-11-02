@@ -1,6 +1,6 @@
 packages:
   - "apps/*"
-  - "packages/*"
+  - "packages/*" # Auto-discovers each direct child workspace package.
   - "services/*"
 
 overrides:
