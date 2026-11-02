@@ -8,6 +8,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@fluently/i18n": "workspace:*",
     "lucide-react": "0.468.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
