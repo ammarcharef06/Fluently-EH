@@ -24,7 +24,7 @@ type DownloadResult =
         | 'integrity_failed';
     };
 
-async function readBoundedResponse(
+export async function readBoundedResponse(
   response: Response,
   maxBytes: number
 ): Promise<Uint8Array | null> {
