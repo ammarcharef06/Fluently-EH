@@ -37,8 +37,8 @@ export type MasteryResult = {
   distinctQuestions: number;
   distinctContexts: number;
   /**
-   * Kept for compatibility. This is the number of distinct questions with
-   * at least one correct response, not the raw count of repeated attempts.
+   * Kept for compatibility. This is the number of distinct questions
+   * whose latest recorded response is correct, not the raw retry count.
    */
   successfulAttempts: number;
   reasons: string[];
