@@ -780,6 +780,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           throw new Error('staged_release_content_hash_mismatch');
         }
 
+        if (archiveObject.size > MAX_PACKAGE_BYTES + 2 * 1024 * 1024) {
+          throw new Error('staged_release_archive_too_large');
+        }
         const archiveBytes = new Uint8Array(await new Response(archiveObject.body).arrayBuffer());
         const archiveHash = (await new Response(archiveHashObject.body).text()).trim();
         if (
