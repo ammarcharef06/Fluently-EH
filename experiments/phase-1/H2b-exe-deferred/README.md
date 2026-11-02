@@ -29,6 +29,12 @@
 1. **بيئة Windows قابلة للتكرار:** Windows runner بإصدار موثق، مع Rust/Cargo وTauri وNode وWebView2 بإصدارات متوافقة، وصلاحية بناء وتثبيت وتشغيل artifact على Windows أو VM مدعوم.
 2. **مسار تقني قابل للإثبات:** بناء EXE/installer، تضمين payload اختبار، قراءة التطبيق له من داخل التوزيع، واختبار checksum سليم/معدل ورفض التفعيل عند تغيير بايت واحد، مع قياس الحجم وزمن البناء والتثبيت/الإطلاق. لا يكفي نجاح build وحده.
 
+## خطوة H2b-1 — فحص بيئة Windows
+
+أُضيف سير عمل `.github/workflows/h2b-windows-environment.yml` على `windows-2025` ليتحقق من Node.js `22.16.0` وRust `1.99.1` وهدف MSVC x64، ووجود Visual Studio C++ Build Tools وWebView2 Evergreen Runtime. يحفظ التقرير كـ artifact لمدة 30 يومًا.
+
+هذه الخطوة **فحص بيئة فقط**؛ لا تبني Tauri ولا EXE ولا تثبت التطبيق ولا تختبر قراءة payload أو tamper. تظل H2b «غير مُثبت» حتى اجتياز جميع شروطها الوظيفية على Windows.
+
 ## بوابة Authenticode المنفصلة
 
 - توقيع Authenticode الموثوق مطلوب بحسب شروط التوزيع المستقر عندما تتوفر شهادة/خدمة موثوقة ومصرح بها.
