@@ -27,4 +27,13 @@ describe('API defaults', () => {
     }), env);
     expect(response.status).toBe(503);
   });
+
+  it('keeps manifest-declared curriculum file delivery behind authentication', async () => {
+    const response = await worker.fetch(new Request(
+      'https://api.fluently.test/v1/curriculum/files/lessons/unit-1/lesson.md'
+    ), env);
+    expect(response.status).toBe(503);
+    const body = await response.json() as { error: string };
+    expect(body.error).toBe('identity_provider_not_configured');
+  });
 });

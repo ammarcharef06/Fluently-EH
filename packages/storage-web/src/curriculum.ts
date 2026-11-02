@@ -1,7 +1,70 @@
-import { CurriculumManifestSchema, verifyPackageFiles, type CurriculumManifest } from '@fluently/content-schema';
+import {
+  validateCurriculumManifest,
+  verifyPackageFiles,
+  type CurriculumManifest
+} from '@fluently/content-schema';
 import { openFluentlyDB } from './index';
 
-type StoredPackage = { packageId: string; contentVersion: string; manifest: CurriculumManifest; activatedAt: string };
+type StoredPackage = {
+  packageId: string;
+  contentVersion: string;
+  manifest: CurriculumManifest;
+  activatedAt: string;
+};
+
+type DownloadResult =
+  | { ok: true; manifest: CurriculumManifest }
+  | {
+      ok: false;
+      reason:
+        | 'authentication_required'
+        | 'not_found'
+        | 'provider_unavailable'
+        | 'invalid_manifest'
+        | 'integrity_failed';
+    };
+
+async function readBoundedResponse(
+  response: Response,
+  maxBytes: number
+): Promise<Uint8Array | null> {
+  const contentLengthHeader = response.headers.get('Content-Length');
+  if (contentLengthHeader) {
+    const contentLength = Number(contentLengthHeader);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) return null;
+  }
+
+  if (!response.body) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return bytes.byteLength <= maxBytes ? bytes : null;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      totalBytes += result.value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(result.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
 
 export async function activateCurriculumPackage(
   manifestInput: unknown,
@@ -10,8 +73,20 @@ export async function activateCurriculumPackage(
   const verified = await verifyPackageFiles(manifestInput, files);
   if (!verified.ok) return verified;
 
-  const db = await openFluentlyDB();
   const manifest = verified.manifest;
+  const verifiedFiles: Array<{
+    path: string;
+    sha256: string;
+    source: Uint8Array;
+  }> = [];
+
+  for (const entry of manifest.files) {
+    const source = files.get(entry.path);
+    if (!source) return { ok: false, errors: ['Missing file after integrity verification: ' + entry.path] };
+    verifiedFiles.push({ path: entry.path, sha256: entry.sha256, source });
+  }
+
+  const db = await openFluentlyDB();
   const tx = db.transaction(['curriculumPackages', 'curriculumFiles'], 'readwrite');
   const fileStore = tx.objectStore('curriculumFiles');
   const existing = await fileStore.getAll();
@@ -19,13 +94,8 @@ export async function activateCurriculumPackage(
     if (item.packageId === manifest.packageId) await fileStore.delete(item.id);
   }
 
-  for (const entry of manifest.files) {
-    const bytes = files.get(entry.path);
-    if (!bytes) {
-      tx.abort();
-      return { ok: false, errors: ['Missing file after integrity verification: ' + entry.path] };
-    }
-    const copy = bytes.slice();
+  for (const entry of verifiedFiles) {
+    const copy = entry.source.slice();
     await fileStore.put({
       id: manifest.packageId + ':' + entry.path,
       packageId: manifest.packageId,
@@ -35,6 +105,7 @@ export async function activateCurriculumPackage(
       sha256: entry.sha256
     });
   }
+
   await tx.objectStore('curriculumPackages').put({
     packageId: manifest.packageId,
     contentVersion: manifest.contentVersion,
@@ -62,34 +133,57 @@ export async function readActiveCurriculumPackage(packageId: string): Promise<{
   return { package: packageRecord, files };
 }
 
-export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<{
-  ok: true; manifest: CurriculumManifest
-} | { ok: false; reason: 'authentication_required' | 'not_found' | 'provider_unavailable' | 'unsupported_package' | 'invalid_manifest' | 'integrity_failed' }> {
-  const base = apiBase.replace(/\/$/, '');
+export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<DownloadResult> {
+  const base = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
   try {
-    const manifestResponse = await fetch(base + '/v1/curriculum/manifest', { credentials: 'include', headers: { Accept: 'application/json' } });
-    if (manifestResponse.status === 401 || manifestResponse.status === 403) return { ok: false, reason: 'authentication_required' };
-    if (manifestResponse.status === 404) return { ok: false, reason: 'not_found' };
-    if (manifestResponse.status === 503) return { ok: false, reason: 'provider_unavailable' };
-    if (!manifestResponse.ok) return { ok: false, reason: 'provider_unavailable' };
-
-    const parsed = CurriculumManifestSchema.safeParse(await manifestResponse.json());
-    if (!parsed.success) return { ok: false, reason: 'invalid_manifest' };
-    const manifest = parsed.data;
-    if (manifest.files.length !== 1 || manifest.files[0]?.path !== 'content.json') {
-      return { ok: false, reason: 'unsupported_package' };
-    }
-
-    const contentResponse = await fetch(base + '/v1/curriculum/content.json', {
+    const manifestResponse = await fetch(base + '/v1/curriculum/manifest', {
       credentials: 'include',
       headers: { Accept: 'application/json' }
     });
-    if (contentResponse.status === 401 || contentResponse.status === 403) return { ok: false, reason: 'authentication_required' };
-    if (contentResponse.status === 503 || !contentResponse.ok) return { ok: false, reason: 'provider_unavailable' };
-    const bytes = new Uint8Array(await contentResponse.arrayBuffer());
-    const result = await activateCurriculumPackage(manifest, new Map([['content.json', bytes]]));
-    if (!result.ok) return { ok: false, reason: 'integrity_failed' };
-    return { ok: true, manifest: result.manifest };
+    if (manifestResponse.status === 401 || manifestResponse.status === 403) {
+      return { ok: false, reason: 'authentication_required' };
+    }
+    if (manifestResponse.status === 404) return { ok: false, reason: 'not_found' };
+    if (!manifestResponse.ok) return { ok: false, reason: 'provider_unavailable' };
+
+    let manifestInput: unknown;
+    try {
+      manifestInput = await manifestResponse.json() as unknown;
+    } catch {
+      return { ok: false, reason: 'invalid_manifest' };
+    }
+
+    const validation = validateCurriculumManifest(manifestInput);
+    if (!validation.ok) return { ok: false, reason: 'invalid_manifest' };
+    const manifest = validation.manifest;
+    const files = new Map<string, Uint8Array>();
+
+    for (const entry of manifest.files) {
+      const encodedPath = entry.path.split('/').map(encodeURIComponent).join('/');
+      const endpoint = entry.path === 'content.json'
+        ? base + '/v1/curriculum/content.json'
+        : base + '/v1/curriculum/files/' + encodedPath;
+      const response = await fetch(endpoint, {
+        credentials: 'include',
+        headers: { Accept: '*/*' }
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        return { ok: false, reason: 'authentication_required' };
+      }
+      if (response.status === 404) return { ok: false, reason: 'not_found' };
+      if (!response.ok) return { ok: false, reason: 'provider_unavailable' };
+
+      const bytes = await readBoundedResponse(response, entry.bytes);
+      if (!bytes || bytes.byteLength !== entry.bytes) {
+        return { ok: false, reason: 'integrity_failed' };
+      }
+      files.set(entry.path, bytes);
+    }
+
+    const activated = await activateCurriculumPackage(manifest, files);
+    if (!activated.ok) return { ok: false, reason: 'integrity_failed' };
+    return { ok: true, manifest: activated.manifest };
   } catch {
     return { ok: false, reason: 'provider_unavailable' };
   }

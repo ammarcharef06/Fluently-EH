@@ -1,7 +1,7 @@
 export type AdminRole = 'owner' | 'editor' | 'reviewer' | 'publisher';
 
 export interface ObjectBucket {
-  get(key: string): Promise<{ body: ReadableStream; httpEtag: string } | null>;
+  get(key: string): Promise<{ body: ReadableStream; httpEtag: string; size: number; httpMetadata?: { contentType?: string } } | null>;
   put(
     key: string,
     value: string | ArrayBuffer | ArrayBufferView | ReadableStream,

@@ -38,33 +38,103 @@ export const MAX_PACKAGE_BYTES = 250 * 1024 * 1024;
 export const MAX_FILE_COUNT = 5000;
 export const MAX_SINGLE_FILE_BYTES = 100 * 1024 * 1024;
 
-export function isSafePackagePath(path: string): boolean {
-  if (!path || path.startsWith('/') || path.startsWith('\\') || path.includes('\\')) return false;
-  return path.split('/').every((segment) => segment.length > 0 && segment !== '.' && segment !== '..' && !/^[A-Za-z]:/.test(segment));
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.charCodeAt(0);
+    return codePoint < 0x20 || codePoint === 0x7f;
+  });
 }
 
-export async function verifyPackageFiles(manifestInput: unknown, files: ReadonlyMap<string, Uint8Array>, supportedSchemaVersion = CURRENT_SCHEMA_VERSION): Promise<{ ok: true; manifest: CurriculumManifest } | { ok: false; errors: string[] }> {
+export function isSafePackagePath(path: string): boolean {
+  if (
+    !path ||
+    path.startsWith('/') ||
+    path.startsWith('\\') ||
+    path.includes('\\') ||
+    hasControlCharacters(path)
+  ) return false;
+
+  return path.split('/').every((segment) =>
+    segment.length > 0 &&
+    segment !== '.' &&
+    segment !== '..' &&
+    !/^[A-Za-z]:/.test(segment)
+  );
+}
+
+export type CurriculumManifestValidation =
+  | { ok: true; manifest: CurriculumManifest }
+  | { ok: false; errors: string[] };
+
+/** Validates package metadata before any file is downloaded or allocated. */
+export function validateCurriculumManifest(
+  manifestInput: unknown,
+  supportedSchemaVersion = CURRENT_SCHEMA_VERSION
+): CurriculumManifestValidation {
   const parsed = CurriculumManifestSchema.safeParse(manifestInput);
-  if (!parsed.success) return { ok: false, errors: parsed.error.issues.map((issue) => issue.message) };
+  if (!parsed.success) {
+    return { ok: false, errors: parsed.error.issues.map((issue) => issue.message) };
+  }
+
   const manifest = parsed.data;
   const errors: string[] = [];
   if (manifest.schemaVersion !== supportedSchemaVersion) errors.push('Unsupported schema version.');
+  if (manifest.files.length === 0) errors.push('Package manifest must declare at least one file.');
   if (manifest.files.length > MAX_FILE_COUNT) errors.push('Too many files in package.');
+
   const seen = new Set<string>();
   let totalBytes = 0;
   for (const entry of manifest.files) {
     if (!isSafePackagePath(entry.path)) errors.push('Unsafe package path: ' + entry.path);
-    if (seen.has(entry.path)) errors.push('Duplicate package path: ' + entry.path);
-    seen.add(entry.path);
+    if (entry.path.toLowerCase() === 'manifest.json') {
+      errors.push('The root manifest.json file must not be listed as package content.');
+    }
+
+    const normalizedPath = entry.path.toLowerCase();
+    if (seen.has(normalizedPath)) errors.push('Duplicate package path: ' + entry.path);
+    seen.add(normalizedPath);
+
+    if (entry.bytes > MAX_SINGLE_FILE_BYTES) {
+      errors.push('File exceeds size limit: ' + entry.path);
+    }
+    totalBytes += entry.bytes;
+  }
+
+  if (totalBytes > MAX_PACKAGE_BYTES) errors.push('Package exceeds total size limit.');
+  return errors.length ? { ok: false, errors } : { ok: true, manifest };
+}
+
+export async function verifyPackageFiles(
+  manifestInput: unknown,
+  files: ReadonlyMap<string, Uint8Array>,
+  supportedSchemaVersion = CURRENT_SCHEMA_VERSION
+): Promise<CurriculumManifestValidation> {
+  const validation = validateCurriculumManifest(manifestInput, supportedSchemaVersion);
+  if (!validation.ok) return validation;
+
+  const manifest = validation.manifest;
+  const errors: string[] = [];
+  let totalBytes = 0;
+
+  for (const entry of manifest.files) {
     const data = files.get(entry.path);
-    if (!data) { errors.push('Missing file: ' + entry.path); continue; }
+    if (!data) {
+      errors.push('Missing file: ' + entry.path);
+      continue;
+    }
+
     if (data.byteLength !== entry.bytes) errors.push('Size mismatch: ' + entry.path);
-    if (data.byteLength > MAX_SINGLE_FILE_BYTES) errors.push('File exceeds size limit: ' + entry.path);
+    if (data.byteLength > MAX_SINGLE_FILE_BYTES) {
+      errors.push('File exceeds size limit: ' + entry.path);
+      continue;
+    }
+
     totalBytes += data.byteLength;
     const digest = await crypto.subtle.digest('SHA-256', data);
     const actual = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
     if (actual !== entry.sha256) errors.push('SHA-256 mismatch: ' + entry.path);
   }
+
   if (totalBytes > MAX_PACKAGE_BYTES) errors.push('Package exceeds total size limit.');
   if (files.size !== manifest.files.length) errors.push('Unexpected files are present in package.');
   return errors.length ? { ok: false, errors } : { ok: true, manifest };
