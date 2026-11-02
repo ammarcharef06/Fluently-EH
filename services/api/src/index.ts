@@ -689,39 +689,44 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       if (rights.some((item) => !item.license || item.license.toLowerCase().includes('pending') || !item.attribution)) {
         return json({ error: 'missing_content_rights' }, 409);
       }
-      const payload = encoder.encode(JSON.stringify({
-        packageId: 'fluently.core',
-        contentVersion: parsed.data.contentVersion,
-        lessons
-      }, null, 2));
-      const digest = await sha256Hex(payload);
-      const manifest = {
-        packageId: 'fluently.core',
-        contentVersion: parsed.data.contentVersion,
-        schemaVersion: 1,
-        minAppVersion: '0.1.0',
-        maxAppVersion: null,
-        generatedAt: new Date().toISOString(),
-        files: [{ path: 'content.json', bytes: payload.byteLength, sha256: digest }],
-        rights
-      };
+
+      const bundle = await buildCurriculumArchive(lessons, parsed.data.contentVersion);
       const releaseId = crypto.randomUUID();
-      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/content.json', payload, {
-        httpMetadata: { contentType: 'application/json' }
+      for (const [filePath, bytes] of bundle.files) {
+        const contentType = filePath.endsWith('.json')
+          ? 'application/json; charset=utf-8'
+          : filePath.endsWith('.md')
+            ? 'text/markdown; charset=utf-8'
+            : 'application/octet-stream';
+        await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/' + filePath, bytes, {
+          httpMetadata: { contentType }
+        });
+      }
+      const manifestText = JSON.stringify(bundle.manifest);
+      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/manifest.json', manifestText, {
+        httpMetadata: { contentType: 'application/json; charset=utf-8' }
       });
-      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/manifest.json', JSON.stringify(manifest), {
-        httpMetadata: { contentType: 'application/json' }
+      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/curriculum.zip', bundle.archive, {
+        httpMetadata: { contentType: 'application/zip' }
+      });
+      await env.CURRICULUM_BUCKET.put('staged/' + releaseId + '/curriculum.zip.sha256', bundle.archiveSha256, {
+        httpMetadata: { contentType: 'text/plain; charset=utf-8' }
       });
       const created = await sql.begin(async (tx) => {
         await tx.unsafe("select set_config('app.user_id', $1, true)", [user.userId]);
         const inserted = await tx.unsafe(
           "insert into curriculum_releases (id,package_id,content_version,schema_version,manifest,package_sha256,status) " +
           "values ($1,'fluently.core',$2,1,$3::jsonb,$4,'staged') returning id,content_version,status,package_sha256",
-          [releaseId, parsed.data.contentVersion, JSON.stringify(manifest), digest]
+          [releaseId, parsed.data.contentVersion, JSON.stringify(bundle.manifest), bundle.contentSha256]
         );
         await tx.unsafe(
           "insert into audit_events (actor_user_id,action,subject_id,metadata) values ($1,'curriculum.stage_release',$2,$3::jsonb)",
-          [user.userId, releaseId, JSON.stringify({ contentVersion: parsed.data.contentVersion, sha256: digest })]
+          [user.userId, releaseId, JSON.stringify({
+            contentVersion: parsed.data.contentVersion,
+            contentSha256: bundle.contentSha256,
+            archiveSha256: bundle.archiveSha256,
+            fileCount: bundle.manifest.files.length
+          })]
         );
         return inserted[0];
       });
