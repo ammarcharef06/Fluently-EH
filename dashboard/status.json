@@ -1,0 +1,9 @@
+{
+  "phase_0": { "status": "done", "text": "مكتمل 100%" },
+  "phase_1": { "status": "active", "text": "قيد التشخيص" },
+  "phase_2": { "status": "pending", "text": "لم يبدأ" },
+  "phase_3": { "status": "pending", "text": "لم يبدأ" },
+  "phase_4": { "status": "pending", "text": "لم يبدأ" },
+  "phase_5": { "status": "pending", "text": "لم يبدأ" },
+  "phase_6": { "status": "pending", "text": "لم يبدأ" }
+}
