@@ -334,6 +334,7 @@
     .mini-tag.pending { background: var(--amber-soft); color: var(--amber); }
     .empty-state { color: var(--muted); font-size: 12px; padding: 12px 0; }
     .error-note { margin-top: 10px; color: var(--amber); font-size: 11px; }
+    .refresh-stamp { margin: 6px 0 0; color: var(--muted); font-size: 10px; }
 
     .guardrails {
       display: flex;
@@ -479,6 +480,7 @@
         </article>
       </div>
       <p class="error-note" id="api-error" role="status" aria-live="polite"></p>
+      <p class="refresh-stamp" id="last-refresh" aria-live="polite">—</p>
     </section>
 
     <section class="section content-grid" aria-label="Project state">
@@ -758,7 +760,7 @@
 
       function setLiveState(state) {
         const pill = byId('live-pill');
-        pill.classList.toggle('offline', state !== 'ok');
+        pill.classList.toggle('offline', state !== 'live');
         text('live-label', copy[locale][state] || copy[locale].partial);
       }
 
@@ -953,7 +955,7 @@
           if (!byId('api-error').textContent) text('api-error', copy[locale].apiProblem);
         }
 
-        text('last-refresh', formatDate(new Date().toISOString()));
+        text('last-refresh', (locale === 'ar' ? 'آخر تحديث: ' : 'Last refreshed: ') + formatDate(new Date().toISOString()));
         refreshing = false;
         button.disabled = false;
       }
