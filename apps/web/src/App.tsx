@@ -9,7 +9,8 @@ import {
   Settings2, ShieldCheck, Sparkles, Sun, Target, Volume2, X
 } from 'lucide-react';
 import { draftLessons, curriculumStages } from '@fluently/curriculum';
-import { createSyncOperation, gradeChoice, scheduleReview, selectDueReviews, type ChoiceQuestion, type ReviewState } from '@fluently/domain';
+import { createSyncOperation, scheduleReview, selectDueReviews, type ReviewState } from '@fluently/domain';
+import { gradeChoice, type ChoiceQuestion, type GradeResult } from '@fluently/assessment-engine';
 import {
   enqueueOperation, listLessonProgress, listReviewStates, readLessonProgress, requestPersistentStorage,
   saveLessonProgress, saveReviewState
@@ -393,7 +394,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 
 function ChoiceActivity({ step, objectiveId, onAttempt, onComplete, t }: { step: Extract<Lesson['steps'][number], { type: 'choice' }>; objectiveId: string; onAttempt: (correct: boolean) => void; onComplete: () => void; t: Record<TranslationKey, string> }) {
   const [selected, setSelected] = useState('');
-  const [feedback, setFeedback] = useState<{ correct: boolean; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<GradeResult | null>(null);
   function check() {
     const question: ChoiceQuestion = {
       id: step.questionId, objectiveId, prompt: step.prompt,
@@ -401,11 +402,11 @@ function ChoiceActivity({ step, objectiveId, onAttempt, onComplete, t }: { step:
       explanationCorrect: step.explanation, explanationIncorrect: t.incorrectChoicePrefix + step.explanation
     };
     const result = gradeChoice(question, selected);
-    setFeedback({ correct: result.correct, text: result.feedback });
+    setFeedback(result);
     onAttempt(result.correct);
     if (result.correct) onComplete();
   }
-  return <div className="choice-activity"><span className="step-type"><CircleHelp size={16} />{t.objective}</span><h2>{step.prompt}</h2><div className="choice-options">{step.options.map((option) => <button key={option.id} className={selected === option.id ? 'choice-option selected' : 'choice-option'} onClick={() => { setSelected(option.id); setFeedback(null); }}><span className="choice-radio">{selected === option.id ? <Check size={14} /> : null}</span>{option.text}</button>)}</div><button className="button button-primary" disabled={!selected} onClick={check}>{t.answer}</button>{feedback && <div className={feedback.correct ? 'feedback correct' : 'feedback incorrect'}>{feedback.correct ? <CheckCircle2 size={18} /> : <CircleHelp size={18} />}{feedback.text}</div>}</div>;
+  return <div className="choice-activity"><span className="step-type"><CircleHelp size={16} />{t.objective}</span><h2>{step.prompt}</h2><div className="choice-options">{step.options.map((option) => <button key={option.id} className={selected === option.id ? 'choice-option selected' : 'choice-option'} onClick={() => { setSelected(option.id); setFeedback(null); }}><span className="choice-radio">{selected === option.id ? <Check size={14} /> : null}</span>{option.text}</button>)}</div><button className="button button-primary" disabled={!selected} onClick={check}>{t.answer}</button>{feedback && <div className={feedback.correct ? 'feedback correct' : 'feedback incorrect'}><div className="feedback-message">{feedback.correct ? <CheckCircle2 size={18} /> : <CircleHelp size={18} />}{feedback.feedback}</div>{feedback.example && <p className="feedback-example">{feedback.example}</p>}</div>}</div>;
 }
 
 export default App;
