@@ -59,7 +59,7 @@ export async function downloadAndActivateCurriculumZip(apiBase = '/api'): Promis
     }
     if (!archiveResponse.ok) return { ok: false, reason: 'provider_unavailable' };
 
-    const contentType = archiveResponse.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
+    const contentType = archiveResponse.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase();
     if (contentType !== 'application/zip') return { ok: false, reason: 'integrity_failed' };
 
     const archive = await readBoundedResponse(archiveResponse, MAX_CURRICULUM_ZIP_BYTES);
