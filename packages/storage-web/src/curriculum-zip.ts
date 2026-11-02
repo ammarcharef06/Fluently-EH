@@ -47,7 +47,6 @@ type ZipEntry = {
   compressedSize: number;
   uncompressedSize: number;
   localHeaderOffset: number;
-  dataStart: number;
   recordEnd: number;
 };
 
@@ -138,12 +137,14 @@ function hasExecutableExtension(path: string): boolean {
   const filename = path.split('/').at(-1) ?? '';
   const extension = filename.includes('.') ? filename.split('.').at(-1)?.toLowerCase() : '';
   return new Set([
-    'apk', 'app', 'bat', 'bin', 'class', 'cmd', 'com', 'cjs', 'deb',
-    'desktop', 'dll', 'dmg', 'dylib', 'exe', 'hta', 'htm', 'html',
-    'jar', 'js', 'lnk', 'mht', 'mhtml', 'mjs', 'msi', 'php', 'pl',
-    'ps1', 'psd1', 'psm1', 'py', 'rb', 'reg', 'rpm', 'scr', 'sh',
-    'so', 'svg', 'swf', 'url', 'vbe', 'vbs', 'wasm', 'webloc', 'wsf',
-    'wsh', 'xht', 'xhtml', 'xsl', 'xslt'
+    'a', 'apk', 'app', 'appx', 'bat', 'bin', 'cab', 'class', 'cjs',
+    'cmd', 'com', 'cpl', 'deb', 'desktop', 'dll', 'dmg', 'drv',
+    'dylib', 'elf', 'exe', 'hta', 'htm', 'html', 'ipa', 'iso', 'jar',
+    'js', 'lnk', 'mht', 'mhtml', 'mjs', 'msi', 'msix', 'node', 'o',
+    'obj', 'ocx', 'php', 'pl', 'ps1', 'psd1', 'psm1', 'py', 'pyc',
+    'pyo', 'rb', 'reg', 'rpm', 'scr', 'sh', 'so', 'svg', 'swf',
+    'sys', 'tlb', 'url', 'vbe', 'vbs', 'wasm', 'webloc', 'wsf',
+    'wsh', 'xap', 'xht', 'xhtml', 'xsl', 'xslt'
   ]).has(extension ?? '');
 }
 
@@ -158,14 +159,17 @@ function validateEntryAttributes(
   const creatorOperatingSystem = madeBy >>> 8;
   const unixMode = externalAttributes >>> 16;
   const dosAttributes = externalAttributes & 0xffff;
-  if (dosAttributes & (0x08 | 0x10 | 0x0400)) {
-    fail('unsupported_archive', 'Volume labels, directory entries, and reparse points are not allowed in curriculum ZIP files.');
+  if (dosAttributes & (0x02 | 0x04 | 0x08 | 0x10 | 0x0400)) {
+    fail('unsupported_archive', 'Hidden/system files, volume labels, directory entries, and reparse points are not allowed in curriculum ZIP files.');
   }
 
   if ((creatorOperatingSystem === 3 || creatorOperatingSystem === 19) && unixMode !== 0) {
     const fileType = unixMode & 0xf000;
     if (fileType !== 0 && fileType !== 0x8000) {
       fail('unsupported_archive', 'Unix symlinks and special files are not allowed in curriculum ZIP files.');
+    }
+    if (unixMode & 0o7000) {
+      fail('unsupported_archive', 'Setuid, setgid, and sticky file permissions are not allowed in curriculum ZIP files.');
     }
     if (unixMode & 0o111) {
       fail('unsupported_archive', 'Executable file permissions are not allowed in curriculum ZIP files.');
@@ -333,7 +337,6 @@ function parseZipEntries(archive: Uint8Array): ZipEntry[] {
       compressedSize,
       uncompressedSize,
       localHeaderOffset,
-      dataStart: 0,
       recordEnd: 0
     });
   }
@@ -346,7 +349,7 @@ function parseZipEntries(archive: Uint8Array): ZipEntry[] {
     fail('invalid_archive', 'The ZIP must contain exactly one root manifest.json file.');
   }
 
-  const sorted = [...entries].sort((left, right) => left.path.localeCompare(right.path));
+  const sorted = [...entries].sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
   for (let index = 0; index < sorted.length - 1; index += 1) {
     if (sorted[index + 1]!.path.startsWith(sorted[index]!.path + '/')) {
       fail('invalid_archive', 'A ZIP file path conflicts with a nested file path.');
@@ -413,7 +416,6 @@ function parseZipEntries(archive: Uint8Array): ZipEntry[] {
       ? parseDataDescriptor(view, compressedEnd, centralOffset, entry)
       : compressedEnd;
 
-    entry.dataStart = localDataStart;
     entry.recordEnd = recordEnd;
   }
 
