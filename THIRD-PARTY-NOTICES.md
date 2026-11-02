@@ -8,7 +8,7 @@ This file records third-party software included in Fluently distributions. Depen
 - Version: `0.8.3`
 - Source: https://github.com/101arrowz/fflate
 - Package license: MIT
-- Used by: `packages/storage-web/src/curriculum-zip.ts` for bounded ZIP archive inspection and DEFLATE extraction.
+- Used by: `packages/storage-web/src/curriculum-zip.ts` for bounded ZIP archive inspection and DEFLATE extraction, and `services/api/src/curriculum-package.ts` for ZIP32 curriculum archive creation.
 
 MIT License
 
