@@ -148,6 +148,26 @@ jobs:
       - name: Install pinned Tauri CLI
         run: npm install --global @tauri-apps/cli@2.12.4
 
+      - name: Generate temporary Windows build icon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Add-Type -AssemblyName System.Drawing
+          $iconDirectory = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/icons"
+          New-Item -ItemType Directory -Force -Path $iconDirectory | Out-Null
+          $bitmap = [System.Drawing.Bitmap]::new(32, 32)
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.Clear([System.Drawing.Color]::FromArgb(24, 72, 112))
+          $graphics.Dispose()
+          $handle = $bitmap.GetHicon()
+          $icon = [System.Drawing.Icon]::FromHandle($handle)
+          $stream = [System.IO.File]::Create((Join-Path $iconDirectory "icon.ico"))
+          try { $icon.Save($stream) } finally {
+            $stream.Dispose()
+            $icon.Dispose()
+            $bitmap.Dispose()
+          }
+
       - name: Build Windows QA executable
         working-directory: apps/desktop/src-tauri
         run: tauri build --no-bundle
