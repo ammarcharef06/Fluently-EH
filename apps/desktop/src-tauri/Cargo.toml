@@ -1,0 +1,12 @@
+[package]
+name = "fluently-desktop"
+version = "0.1.0"
+description = "Fluently Windows desktop application"
+authors = ["Fluently contributors"]
+edition = "2024"
+
+[build-dependencies]
+tauri-build = { version = "2.7.4" }
+
+[dependencies]
+tauri = { version = "2.12.5" }
