@@ -1,6 +1,6 @@
 packages:
   - "apps/*"
-  - "packages/*" # Auto-discovers each direct child workspace package.
+  - "packages/*" # Auto-discovers @fluently/i18n and @fluently/assessment-engine with other direct packages.
   - "services/*"
 
 overrides:
