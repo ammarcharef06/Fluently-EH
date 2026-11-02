@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@fluently/assessment-engine": "workspace:*",
     "@fluently/content-schema": "workspace:*",
     "@fluently/curriculum": "workspace:*",
     "@fluently/domain": "workspace:*",
