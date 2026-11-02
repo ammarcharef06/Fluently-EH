@@ -9,7 +9,7 @@
     "build": "pnpm --filter @fluently/web build && pnpm --filter @fluently/admin build",
     "build:web": "pnpm --filter @fluently/web build",
     "build:admin": "pnpm --filter @fluently/admin build",
-    "typecheck": "tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json && tsc --noEmit -p services/api/tsconfig.json && tsc --noEmit -p packages/domain/tsconfig.json && tsc --noEmit -p packages/content-schema/tsconfig.json && tsc --noEmit -p packages/storage-web/tsconfig.json && tsc --noEmit -p packages/curriculum/tsconfig.json && tsc --noEmit -p packages/curriculum-engine/tsconfig.json",
+    "typecheck": "tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json && tsc --noEmit -p services/api/tsconfig.json && tsc --noEmit -p packages/domain/tsconfig.json && tsc --noEmit -p packages/content-schema/tsconfig.json && tsc --noEmit -p packages/storage-web/tsconfig.json && tsc --noEmit -p packages/curriculum/tsconfig.json && tsc --noEmit -p packages/curriculum-engine/tsconfig.json && tsc --noEmit -p packages/i18n/tsconfig.json",
     "test": "vitest run",
     "lint": "eslint .",
     "security:check": "node scripts/security-check.mjs",
