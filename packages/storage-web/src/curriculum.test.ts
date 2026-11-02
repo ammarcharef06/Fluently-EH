@@ -151,4 +151,28 @@ describe('atomic curriculum activation', () => {
     expect(result).toEqual({ ok: false, reason: 'integrity_failed' });
     expect(await readActiveCurriculumPackage(packageId)).toBeNull();
   });
+
+  it('preflights storage before requesting any manifest-declared file', async () => {
+    const packageId = 'fluently.test.legacy-quota.' + crypto.randomUUID();
+    const content = new TextEncoder().encode('{"lessons":[]}');
+    const manifest = await packageManifest(packageId, '1.0.0', [
+      { path: 'content.json', bytes: content }
+    ]);
+    vi.stubGlobal('navigator', {
+      storage: { estimate: vi.fn().mockResolvedValue({ quota: 1000, usage: 990 }) }
+    });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(manifest)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await downloadAndActivateCurriculum('/api');
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'storage_quota_insufficient',
+      requiredBytes: content.byteLength,
+      availableBytes: 10
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await readActiveCurriculumPackage(packageId)).toBeNull();
+  });
 });

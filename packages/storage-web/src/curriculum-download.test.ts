@@ -123,4 +123,26 @@ describe('first-run ZIP curriculum download', () => {
     expect(stored?.package.contentVersion).toBe('1.0.0');
     expect(new TextDecoder().decode(stored?.files.get('content.json'))).toBe('active package v1');
   });
+
+  it('stops before fetching the ZIP when the browser quota estimate is insufficient', async () => {
+    const packageId = 'fluently.test.quota.' + crypto.randomUUID();
+    const content = new TextEncoder().encode('{"lessons":[]}');
+    const manifest = await manifestFor(packageId, '1.0.0', content);
+    vi.stubGlobal('navigator', {
+      storage: { estimate: vi.fn().mockResolvedValue({ quota: 1000, usage: 990 }) }
+    });
+    const fetchMock = vi.fn(async () => jsonResponse(manifest));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await downloadAndActivateCurriculumZip('/api');
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'storage_quota_insufficient',
+      requiredBytes: content.byteLength,
+      availableBytes: 10
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await readActiveCurriculumPackage(packageId)).toBeNull();
+  });
 });

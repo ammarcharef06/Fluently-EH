@@ -14,6 +14,7 @@ type StoredPackage = {
 
 type DownloadResult =
   | { ok: true; manifest: CurriculumManifest }
+  | { ok: false; reason: 'storage_quota_insufficient'; requiredBytes: number; availableBytes: number }
   | {
       ok: false;
       reason:
@@ -23,6 +24,37 @@ type DownloadResult =
         | 'invalid_manifest'
         | 'integrity_failed';
     };
+
+export type CurriculumStoragePreflightResult =
+  | { ok: true; requiredBytes: number; availableBytes: number | null }
+  | { ok: false; reason: 'storage_quota_insufficient'; requiredBytes: number; availableBytes: number };
+
+export async function preflightCurriculumStorage(
+  requiredBytes: number
+): Promise<CurriculumStoragePreflightResult> {
+  if (!Number.isSafeInteger(requiredBytes) || requiredBytes < 0) {
+    throw new Error('The required curriculum storage size must be a non-negative safe integer.');
+  }
+  if (typeof navigator === 'undefined' || typeof navigator.storage?.estimate !== 'function') {
+    return { ok: true, requiredBytes, availableBytes: null };
+  }
+
+  let estimate: StorageEstimate | undefined;
+  try {
+    estimate = await navigator.storage.estimate();
+  } catch {
+    return { ok: true, requiredBytes, availableBytes: null };
+  }
+  if (typeof estimate?.quota !== 'number' || typeof estimate.usage !== 'number') {
+    return { ok: true, requiredBytes, availableBytes: null };
+  }
+
+  const availableBytes = Math.max(0, estimate.quota - estimate.usage);
+  if (availableBytes < requiredBytes) {
+    return { ok: false, reason: 'storage_quota_insufficient', requiredBytes, availableBytes };
+  }
+  return { ok: true, requiredBytes, availableBytes };
+}
 
 export async function readBoundedResponse(
   response: Response,
@@ -146,9 +178,12 @@ export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<D
     if (manifestResponse.status === 404) return { ok: false, reason: 'not_found' };
     if (!manifestResponse.ok) return { ok: false, reason: 'provider_unavailable' };
 
+    const manifestBytes = await readBoundedResponse(manifestResponse, 2 * 1024 * 1024);
+    if (!manifestBytes) return { ok: false, reason: 'invalid_manifest' };
+
     let manifestInput: unknown;
     try {
-      manifestInput = await manifestResponse.json() as unknown;
+      manifestInput = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes)) as unknown;
     } catch {
       return { ok: false, reason: 'invalid_manifest' };
     }
@@ -156,6 +191,9 @@ export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<D
     const validation = validateCurriculumManifest(manifestInput);
     if (!validation.ok) return { ok: false, reason: 'invalid_manifest' };
     const manifest = validation.manifest;
+    const requiredBytes = manifest.files.reduce((total, entry) => total + entry.bytes, 0);
+    const storage = await preflightCurriculumStorage(requiredBytes);
+    if (!storage.ok) return storage;
     const files = new Map<string, Uint8Array>();
 
     for (const entry of manifest.files) {

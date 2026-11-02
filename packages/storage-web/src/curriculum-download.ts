@@ -1,6 +1,6 @@
 import { validateCurriculumManifest, type CurriculumManifest } from '@fluently/content-schema';
 import { importCurriculumZip, MAX_CURRICULUM_ZIP_BYTES } from './curriculum-zip';
-import { readBoundedResponse } from './curriculum';
+import { preflightCurriculumStorage, readBoundedResponse } from './curriculum';
 
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 
@@ -16,6 +16,11 @@ export type CurriculumZipDownloadResult =
         | 'invalid_manifest'
         | 'archive_too_large'
         | 'integrity_failed';
+    } | {
+      ok: false;
+      reason: 'storage_quota_insufficient';
+      requiredBytes: number;
+      availableBytes: number;
     };
 
 /**
@@ -46,6 +51,10 @@ export async function downloadAndActivateCurriculumZip(apiBase = '/api'): Promis
     }
     const validation = validateCurriculumManifest(manifestInput);
     if (!validation.ok) return { ok: false, reason: 'invalid_manifest' };
+
+    const requiredBytes = validation.manifest.files.reduce((total, entry) => total + entry.bytes, 0);
+    const storage = await preflightCurriculumStorage(requiredBytes);
+    if (!storage.ok) return storage;
 
     const archiveResponse = await fetch(base + '/v1/curriculum/package.zip', {
       credentials: 'include',
