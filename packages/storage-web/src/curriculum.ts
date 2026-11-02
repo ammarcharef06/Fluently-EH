@@ -127,7 +127,7 @@ export async function readActiveCurriculumPackage(packageId: string): Promise<{
 }
 
 export async function downloadAndActivateCurriculum(apiBase = '/api'): Promise<DownloadResult> {
-  const base = apiBase.replace(/\\/$/, '');
+  const base = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
   try {
     const manifestResponse = await fetch(base + '/v1/curriculum/manifest', {
       credentials: 'include',
