@@ -266,6 +266,9 @@ importers:
       '@fluently/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@fluently/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@fluently/storage-web':
         specifier: workspace:*
         version: link:../../packages/storage-web
