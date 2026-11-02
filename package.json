@@ -12,18 +12,19 @@
   ],
   "scripts": {
     "dev": "node scripts/dev-stack.mjs",
-    "dev:admin": "npm run dev --workspace @fluently/admin",
-    "build": "npm run build --workspace @fluently/web && npm run build --workspace @fluently/admin",
+    "dev:admin": "pnpm --filter @fluently/admin dev",
+    "build": "pnpm --filter @fluently/web build && pnpm --filter @fluently/admin build",
+    "build:web": "pnpm --filter @fluently/web build",
+    "build:admin": "pnpm --filter @fluently/admin build",
     "typecheck": "tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/admin/tsconfig.json && tsc --noEmit -p services/api/tsconfig.json && tsc --noEmit -p packages/domain/tsconfig.json && tsc --noEmit -p packages/content-schema/tsconfig.json && tsc --noEmit -p packages/storage-web/tsconfig.json && tsc --noEmit -p packages/curriculum/tsconfig.json",
     "test": "vitest run",
     "lint": "eslint .",
     "security:check": "node scripts/security-check.mjs",
     "content:validate": "node scripts/validate-curriculum.mjs",
     "content:build": "node scripts/build-curriculum.mjs",
-    "check": "npm run typecheck && npm test && npm run lint && npm run security:check && npm run content:validate",
-    "dev:web": "npm run dev --workspace @fluently/web",
-    "dev:api": "npm run dev --workspace @fluently/api",
-    "build:android": "npm run build:web && npm run sync --workspace @fluently/android"
+    "check": "pnpm run typecheck && pnpm test && pnpm lint && pnpm run security:check && pnpm run content:validate",
+    "dev:web": "pnpm --filter @fluently/web dev",
+    "dev:api": "pnpm --filter @fluently/api dev"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -45,9 +46,12 @@
     "@testing-library/jest-dom": "6.6.3",
     "fake-indexeddb": "6.0.0"
   },
-  "overrides": {
-    "glob": "14.0.2",
-    "minimatch": "11.0.1",
-    "zod": "4.6.7"
+  "packageManager": "pnpm@12.16.1",
+  "pnpm": {
+    "overrides": {
+      "glob": "14.0.2",
+      "minimatch": "11.0.1",
+      "zod": "4.6.7"
+    }
   }
 }
