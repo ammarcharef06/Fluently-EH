@@ -101,6 +101,39 @@ function setEntryUnixSymlink(archive: Uint8Array, name: string): Uint8Array {
   });
 }
 
+function setEntryDosReparsePoint(archive: Uint8Array, name: string): Uint8Array {
+  return mutateArchive(archive, (_copy, view) => {
+    const entry = directoryEntryOffsets(archive).find((candidate) => candidate.name === name);
+    if (!entry) throw new Error('test ZIP entry not found: ' + name);
+    view.setUint32(
+      entry.centralHeaderOffset + 38,
+      view.getUint32(entry.centralHeaderOffset + 38, true) | 0x0400,
+      true
+    );
+  });
+}
+
+function insertGapBeforeCentralDirectory(archive: Uint8Array): Uint8Array {
+  const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+  let eocdOffset = -1;
+  for (let offset = archive.byteLength - 22; offset >= Math.max(0, archive.byteLength - 22 - 0xffff); offset -= 1) {
+    if (view.getUint32(offset, true) === 0x06054b50 &&
+        offset + 22 + view.getUint16(offset + 20, true) === archive.byteLength) {
+      eocdOffset = offset;
+      break;
+    }
+  }
+  if (eocdOffset < 0) throw new Error('test ZIP has no EOCD');
+  const centralOffset = view.getUint32(eocdOffset + 16, true);
+  const copy = new Uint8Array(archive.byteLength + 1);
+  copy.set(archive.subarray(0, centralOffset), 0);
+  copy[centralOffset] = 0x7f;
+  copy.set(archive.subarray(centralOffset), centralOffset + 1);
+  const nextView = new DataView(copy.buffer);
+  nextView.setUint32(eocdOffset + 1 + 16, centralOffset + 1, true);
+  return copy;
+}
+
 function setLocalFilenameMismatch(archive: Uint8Array, name: string): Uint8Array {
   return mutateArchive(archive, (copy, view) => {
     const entry = directoryEntryOffsets(archive).find((candidate) => candidate.name === name);
@@ -233,7 +266,7 @@ describe('curriculum ZIP import', () => {
     });
   });
 
-  it('rejects encrypted, symlink, and mismatched local/central header entries', async () => {
+  it('rejects encrypted, Unix symlink, Windows reparse, active-content, and mismatched header entries', async () => {
     const packageId = 'fluently.test.zip.headers.' + crypto.randomUUID();
     const files: PackageFiles = {
       'content.json': strToU8('{"lessons":[]}'),
@@ -250,9 +283,26 @@ describe('curriculum ZIP import', () => {
       ok: false,
       reason: 'unsupported_archive'
     });
+    expect(await importCurriculumZip(setEntryDosReparsePoint(original, 'lesson.md'), manifest)).toMatchObject({
+      ok: false,
+      reason: 'unsupported_archive'
+    });
     expect(await importCurriculumZip(setLocalFilenameMismatch(original, 'lesson.md'), manifest)).toMatchObject({
       ok: false,
       reason: 'invalid_archive'
+    });
+
+    const activeFiles: PackageFiles = {
+      'content.json': strToU8('{"lessons":[]}'),
+      'media/icon.svg': strToU8('<svg/>')
+    };
+    const activeManifest = await createManifest(
+      'fluently.test.zip.svg.' + crypto.randomUUID(),
+      activeFiles
+    );
+    expect(await importCurriculumZip(createZip(activeManifest, activeFiles), activeManifest)).toMatchObject({
+      ok: false,
+      reason: 'unsupported_archive'
     });
   });
 
@@ -265,6 +315,10 @@ describe('curriculum ZIP import', () => {
     expect(await importCurriculumZip(setZip64Sentinel(archive), manifest)).toMatchObject({
       ok: false,
       reason: 'unsupported_archive'
+    });
+    expect(await importCurriculumZip(insertGapBeforeCentralDirectory(archive), manifest)).toMatchObject({
+      ok: false,
+      reason: 'invalid_archive'
     });
     expect(await importCurriculumZip(archive.slice(0, -8), manifest)).toMatchObject({
       ok: false,
