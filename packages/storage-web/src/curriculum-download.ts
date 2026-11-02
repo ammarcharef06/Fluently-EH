@@ -1,6 +1,6 @@
 import { validateCurriculumManifest, type CurriculumManifest } from '@fluently/content-schema';
 import { importCurriculumZip, MAX_CURRICULUM_ZIP_BYTES } from './curriculum-zip';
-import { preflightCurriculumStorage, readBoundedResponse } from './curriculum';
+import { preflightCurriculumStorage, readBoundedResponse, type CurriculumDownloadProgress } from './curriculum';
 
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 
@@ -27,7 +27,10 @@ export type CurriculumZipDownloadResult =
  * Downloads the trusted manifest separately from the ZIP archive, then lets the
  * ZIP importer validate all archive entries and atomically activate the package.
  */
-export async function downloadAndActivateCurriculumZip(apiBase = '/api'): Promise<CurriculumZipDownloadResult> {
+export async function downloadAndActivateCurriculumZip(
+  apiBase = '/api',
+  options: { onProgress?: (progress: CurriculumDownloadProgress) => void } = {}
+): Promise<CurriculumZipDownloadResult> {
   const base = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
   try {
     const manifestResponse = await fetch(base + '/v1/curriculum/manifest', {
@@ -71,7 +74,11 @@ export async function downloadAndActivateCurriculumZip(apiBase = '/api'): Promis
     const contentType = archiveResponse.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase();
     if (contentType !== 'application/zip') return { ok: false, reason: 'integrity_failed' };
 
-    const archive = await readBoundedResponse(archiveResponse, MAX_CURRICULUM_ZIP_BYTES);
+    const archive = await readBoundedResponse(
+      archiveResponse,
+      MAX_CURRICULUM_ZIP_BYTES,
+      (receivedBytes, totalBytes) => options.onProgress?.({ receivedBytes, totalBytes })
+    );
     if (!archive) return { ok: false, reason: 'archive_too_large' };
 
     const imported = await importCurriculumZip(archive, validation.manifest);
