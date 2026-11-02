@@ -1,993 +1,367 @@
-<!doctype html>
-<html lang="ar" dir="rtl">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101b2d">
-  <meta name="description" content="لوحة متابعة مستقلة لعرض تقدم تطوير Fluently من بيانات المستودع العامة.">
-  <title>Fluently — لوحة متابعة المشروع</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --bg: #f3f6fa;
-      --surface: #ffffff;
-      --surface-soft: #f8fafc;
-      --surface-dark: #101b2d;
-      --ink: #162238;
-      --muted: #68758a;
-      --line: #e4eaf1;
-      --accent: #147d75;
-      --accent-soft: #e5f5f2;
-      --blue: #4361a5;
-      --blue-soft: #edf2ff;
-      --amber: #9a6818;
-      --amber-soft: #fff5df;
-      --red: #a43f4c;
-      --red-soft: #fff0f1;
-      --shadow: 0 16px 45px rgba(23, 39, 62, .07);
-      --radius: 19px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluently-EH | لوحة المتابعة الحية</title>
+    <style>
+        /* إعدادات الألوان والوضع الليلي/النهاري */
+        :root {
+            --bg: #0f172a; --card-bg: #1e293b; --text: #f8fafc; --text-muted: #94a3b8;
+            --primary: #3b82f6; --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+            --border: #334155; --live-green: #22c55e; --offline-red: #ef4444;
+        }
+        [data-theme="light"] {
+            --bg: #f1f5f9; --card-bg: #ffffff; --text: #0f172a; --text-muted: #64748b;
+            --primary: #2563eb; --success: #059669; --warning: #d97706; --danger: #dc2626;
+            --border: #cbd5e1; --live-green: #16a34a; --offline-red: #dc2626;
+        }
 
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--ink);
-      background:
-        radial-gradient(900px 450px at 92% -8%, rgba(20, 125, 117, .10), transparent 70%),
-        radial-gradient(700px 380px at -8% 16%, rgba(67, 97, 165, .08), transparent 68%),
-        var(--bg);
-      line-height: 1.65;
-    }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; transition: background 0.3s, color 0.3s; }
+        .container { max-width: 1000px; margin: 0 auto; }
 
-    a { color: inherit; }
-    button { font: inherit; }
-    .shell { width: min(1220px, calc(100% - 36px)); margin-inline: auto; }
+        /* الشريط العلوي */
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        header h1 { font-size: 1.8rem; color: var(--primary); }
+        
+        .controls { display: flex; align-items: center; gap: 1rem; }
+        .icon-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 0.5rem; border-radius: 8px; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
+        .icon-btn:hover { background: var(--border); }
+        .icon-btn.spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
 
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      background: rgba(16, 27, 45, .96);
-      border-bottom: 1px solid rgba(255,255,255,.08);
-      color: #f6f8fc;
-      backdrop-filter: blur(14px);
-    }
-    .topbar-inner {
-      min-height: 76px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-    }
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      color: inherit;
-      text-decoration: none;
-      min-width: 0;
-    }
-    .brand-mark {
-      width: 42px;
-      height: 42px;
-      display: grid;
-      place-items: center;
-      border-radius: 13px;
-      color: #fff;
-      font-weight: 850;
-      font-size: 21px;
-      background: linear-gradient(145deg, #1e9b8f, #12645f);
-      box-shadow: 0 7px 18px rgba(20,125,117,.25);
-    }
-    .brand-copy { display: grid; line-height: 1.25; }
-    .brand-copy strong { font-size: 16px; letter-spacing: .2px; }
-    .brand-copy small { color: #aebbd0; font-size: 11px; margin-top: 4px; }
-    .top-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
-    .live-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 11px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.07);
-      color: #dfe9f5;
-      border-radius: 999px;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-    .live-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #55d6ad;
-      box-shadow: 0 0 0 4px rgba(85,214,173,.12);
-    }
-    .live-pill.offline .live-dot { background: #e5ad55; box-shadow: 0 0 0 4px rgba(229,173,85,.13); }
-    .control-button {
-      border: 1px solid rgba(255,255,255,.16);
-      background: rgba(255,255,255,.08);
-      color: #fff;
-      border-radius: 11px;
-      padding: 8px 12px;
-      cursor: pointer;
-      transition: background .18s ease, transform .18s ease;
-    }
-    .control-button:hover { background: rgba(255,255,255,.15); }
-    .control-button:active { transform: translateY(1px); }
-    .control-button:disabled { cursor: wait; opacity: .65; }
-    .control-button:focus-visible, a:focus-visible { outline: 3px solid #70d8cc; outline-offset: 3px; }
+        /* مؤشر الحالة */
+        .live-indicator { display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); border: 1px solid var(--border); padding: 0.4rem 1rem; border-radius: 50px; font-size: 0.85rem; font-weight: bold; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: var(--warning); transition: 0.3s; }
+        .status-dot.live { background-color: var(--live-green); box-shadow: 0 0 10px var(--live-green); animation: pulse 2s infinite; }
+        .status-dot.offline { background-color: var(--offline-red); box-shadow: 0 0 10px var(--offline-red); }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-    main { padding: 35px 0 54px; }
-    .hero {
-      display: flex;
-      justify-content: space-between;
-      align-items: end;
-      gap: 25px;
-      margin-bottom: 25px;
-    }
-    .eyebrow {
-      margin: 0 0 9px;
-      color: var(--accent);
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .12em;
-    }
-    h1 {
-      margin: 0;
-      color: #142039;
-      font-size: clamp(28px, 4vw, 43px);
-      line-height: 1.2;
-      letter-spacing: -.04em;
-    }
-    .hero-copy {
-      max-width: 720px;
-      margin: 12px 0 0;
-      color: var(--muted);
-      font-size: 15px;
-    }
-    .hero-side {
-      min-width: 210px;
-      padding: 14px 17px;
-      border: 1px solid #dce8e8;
-      background: linear-gradient(145deg, #f1fbf8, #ffffff);
-      border-radius: 15px;
-    }
-    .hero-side span { display: block; color: var(--muted); font-size: 11px; }
-    .hero-side strong { display: block; color: #176a64; font-size: 13px; margin-top: 4px; direction: ltr; text-align: right; }
-    .notice {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 14px 16px;
-      margin: 0 0 22px;
-      border: 1px solid #dce7f4;
-      background: #f4f8ff;
-      border-radius: 14px;
-      color: #43516a;
-      font-size: 13px;
-    }
-    .notice-icon {
-      flex: 0 0 25px;
-      height: 25px;
-      display: grid;
-      place-items: center;
-      border-radius: 8px;
-      color: var(--blue);
-      background: var(--blue-soft);
-      font-weight: 800;
-    }
-    .notice p { margin: 0; }
-    .section { margin-top: 30px; }
-    .section-heading {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 16px;
-      margin: 0 0 14px;
-    }
-    .section-heading h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
-    .section-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
-    .source-link {
-      color: var(--accent);
-      font-size: 12px;
-      font-weight: 700;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .source-link:hover { text-decoration: underline; }
+        /* القواعد الحمراء */
+        .rules-box { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); border-radius: 8px; padding: 1rem; margin-bottom: 2rem; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+        .rule { font-size: 0.85rem; font-weight: bold; color: var(--danger); }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 13px;
-    }
-    .stat-card {
-      min-height: 130px;
-      padding: 17px 18px;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .stat-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .stat-label { color: var(--muted); font-size: 12px; font-weight: 650; }
-    .stat-icon {
-      width: 33px; height: 33px; display: grid; place-items: center;
-      border-radius: 11px; background: var(--accent-soft); color: var(--accent); font-size: 16px;
-    }
-    .stat-value {
-      margin-top: 14px;
-      font-size: clamp(17px, 2.2vw, 24px);
-      font-weight: 800;
-      line-height: 1.25;
-      overflow-wrap: anywhere;
-    }
-    .stat-note { margin-top: 6px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
-    .ltr-value { direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+        /* الشبكة الحية (إحصائيات) */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; text-align: center; }
+        .stat-card h3 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--text); }
 
-    .content-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.5fr) minmax(290px, .85fr);
-      gap: 16px;
-      align-items: start;
-    }
-    .panel {
-      min-width: 0;
-      padding: 20px;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-    }
-    .panel h3 { margin: 0; font-size: 16px; }
-    .panel-intro { color: var(--muted); margin: 4px 0 15px; font-size: 12px; }
-    .work-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .work-card {
-      padding: 13px 14px;
-      background: var(--surface-soft);
-      border: 1px solid var(--line);
-      border-radius: 13px;
-      min-width: 0;
-    }
-    .work-card h4 { margin: 0; font-size: 13px; }
-    .work-card p { margin: 7px 0 0; color: #4e5c71; font-size: 11.5px; line-height: 1.7; overflow-wrap: anywhere; }
-    .work-card .work-next { padding-top: 7px; border-top: 1px solid var(--line); color: #6e798b; }
-    .work-label {
-      display: inline-flex;
-      margin-bottom: 7px;
-      padding: 3px 7px;
-      border-radius: 7px;
-      color: #52627a;
-      background: #edf1f6;
-      font-size: 10px;
-      font-weight: 750;
-    }
-    .snapshot-list { display: grid; gap: 11px; margin-top: 15px; }
-    .snapshot-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--line);
-    }
-    .snapshot-item:last-child { border: 0; padding-bottom: 0; }
-    .snapshot-item span { color: var(--muted); font-size: 12px; }
-    .snapshot-item strong { max-width: 58%; font-size: 12px; text-align: end; overflow-wrap: anywhere; }
-    .snapshot-foot {
-      margin-top: 16px;
-      padding: 12px;
-      border-radius: 12px;
-      background: var(--amber-soft);
-      color: #76521b;
-      font-size: 11px;
-    }
+        /* بطاقات النشر */
+        .deploy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+        .deploy-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; }
+        .deploy-card h3 { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .deploy-value { font-size: 1.2rem; font-weight: bold; }
+        .text-success { color: var(--success); } .text-danger { color: var(--danger); } .text-warning { color: var(--warning); }
 
-    .roadmap {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .roadmap-card {
-      position: relative;
-      min-height: 140px;
-      padding: 17px;
-      border: 1px solid var(--line);
-      background: var(--surface);
-      border-radius: 16px;
-      box-shadow: var(--shadow);
-    }
-    .roadmap-number {
-      width: 28px; height: 28px; display: grid; place-items: center;
-      color: var(--accent); background: var(--accent-soft);
-      border-radius: 9px; font-size: 12px; font-weight: 850;
-    }
-    .roadmap-card h3 { margin: 12px 0 5px; font-size: 14px; }
-    .roadmap-card p { margin: 0; color: var(--muted); font-size: 11.5px; }
-    .roadmap-card .order-note { display: inline-block; margin-top: 10px; color: var(--accent); font-size: 10px; font-weight: 800; }
+        /* الخط الزمني */
+        .timeline { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+        .phase-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .phase-card:hover { transform: translateX(-5px); border-color: var(--primary); }
+        .phase-info h3 { font-size: 1.1rem; margin-bottom: 0.2rem; }
+        .phase-info p { font-size: 0.85rem; color: var(--text-muted); }
+        .status { padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: bold; white-space: nowrap; }
+        .status.done { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid var(--success); }
+        .status.active { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid var(--warning); }
+        .status.pending { background: rgba(148, 163, 184, 0.1); color: var(--text-muted); border: 1px solid var(--border); }
+        .status.delayed { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); }
 
-    .activity-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-    .activity-panel { min-width: 0; }
-    .activity-list { display: grid; gap: 0; margin-top: 12px; }
-    .activity-item {
-      display: block;
-      padding: 11px 0;
-      border-top: 1px solid var(--line);
-      text-decoration: none;
-      min-width: 0;
-    }
-    .activity-item:first-child { border-top: 0; padding-top: 0; }
-    .activity-item:hover .activity-title { color: var(--accent); }
-    .activity-title { display: block; color: var(--ink); font-size: 12px; font-weight: 750; line-height: 1.5; overflow-wrap: anywhere; }
-    .activity-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 5px; color: var(--muted); font-size: 10px; }
-    .mini-tag { padding: 1px 6px; border-radius: 6px; background: #edf1f6; color: #536178; }
-    .mini-tag.success { background: var(--accent-soft); color: #176a64; }
-    .mini-tag.failure { background: var(--red-soft); color: var(--red); }
-    .mini-tag.pending { background: var(--amber-soft); color: var(--amber); }
-    .empty-state { color: var(--muted); font-size: 12px; padding: 12px 0; }
-    .error-note { margin-top: 10px; color: var(--amber); font-size: 11px; }
-    .refresh-stamp { margin: 6px 0 0; color: var(--muted); font-size: 10px; }
+        /* سجل التغييرات (Commits) */
+        .commits-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; }
+        .commits-section h2 { font-size: 1.1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+        .commit-item { display: flex; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+        .commit-item:last-child { border-bottom: none; }
+        .commit-sha { font-family: monospace; color: var(--primary); font-weight: bold; }
+        .commit-msg { color: var(--text); flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .commit-date { color: var(--text-muted); font-size: 0.75rem; }
 
-    .guardrails {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 14px;
-    }
-    .guardrail {
-      padding: 6px 10px;
-      color: #506079;
-      background: #edf1f6;
-      border: 1px solid #e2e8ef;
-      border-radius: 999px;
-      font-size: 10.5px;
-      font-weight: 700;
-    }
-    footer {
-      padding: 22px 0 32px;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 11px;
-    }
-    .footer-inner { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
-    .footer-inner p { margin: 0; max-width: 760px; }
-    .footer-inner a { color: var(--accent); text-decoration: none; }
-    .footer-inner a:hover { text-decoration: underline; }
-    .sr-only {
-      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-    }
-
-    @media (max-width: 920px) {
-      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .content-grid { grid-template-columns: 1fr; }
-      .activity-grid { grid-template-columns: 1fr 1fr; }
-      .activity-panel:last-child { grid-column: 1 / -1; }
-    }
-    @media (max-width: 640px) {
-      .shell { width: min(100% - 24px, 1220px); }
-      .topbar-inner { min-height: 68px; gap: 10px; }
-      .brand-copy small { display: none; }
-      .live-pill { display: none; }
-      .top-actions { gap: 6px; }
-      .control-button { padding: 7px 9px; font-size: 12px; }
-      main { padding-top: 25px; }
-      .hero { display: block; }
-      .hero-side { margin-top: 17px; }
-      .notice { font-size: 12px; }
-      .section-heading { align-items: flex-start; }
-      .stats-grid { gap: 9px; }
-      .stat-card { min-height: 116px; padding: 13px; }
-      .stat-value { font-size: 18px; }
-      .work-grid { grid-template-columns: 1fr; }
-      .roadmap { grid-template-columns: 1fr; }
-      .roadmap-card { min-height: auto; }
-      .activity-grid { grid-template-columns: 1fr; }
-      .activity-panel:last-child { grid-column: auto; }
-      .panel { padding: 16px; }
-      .footer-inner { display: block; }
-      .footer-inner > * + * { margin-top: 8px; }
-    }
-  </style>
+        footer { text-align: center; margin-top: 2rem; color: var(--text-muted); font-size: 0.8rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+        
+        @media (max-width: 768px) {
+            .deploy-grid { grid-template-columns: 1fr; }
+            .phase-card { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+            .commit-msg { white-space: normal; }
+        }
+    </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="shell topbar-inner">
-      <a class="brand" href="https://github.com/ammarcharef06/Fluently-EH" target="_blank" rel="noopener noreferrer">
-        <span class="brand-mark" aria-hidden="true">F</span>
-        <span class="brand-copy">
-          <strong>Fluently</strong>
-          <small data-ar="لوحة متابعة هندسية مستقلة" data-en="Independent engineering dashboard">لوحة متابعة هندسية مستقلة</small>
-        </span>
-      </a>
-      <div class="top-actions">
-        <span class="live-pill" id="live-pill">
-          <span class="live-dot" aria-hidden="true"></span>
-          <span id="live-label" data-ar="تتصل ببيانات GitHub" data-en="Connecting to GitHub">تتصل ببيانات GitHub</span>
-        </span>
-        <button class="control-button" id="refresh-button" type="button" data-ar="تحديث البيانات" data-en="Refresh data">تحديث البيانات</button>
-        <button class="control-button" id="language-button" type="button" aria-label="Switch language">EN</button>
-      </div>
-    </div>
-  </header>
 
-  <main class="shell">
-    <section class="hero" aria-labelledby="page-title">
-      <div>
-        <p class="eyebrow" data-ar="متابعة التنفيذ • Fluently-EH" data-en="ENGINEERING PROGRESS • FLUENTLY-EH">متابعة التنفيذ • Fluently-EH</p>
-        <h1 id="page-title" data-ar="صورة واضحة عن تقدّم المشروع" data-en="A clear view of project progress">صورة واضحة عن تقدّم المشروع</h1>
-        <p class="hero-copy" data-ar="لوحة مستقلة تعرض حالة التنفيذ الموثقة، وآخر التغييرات ونتائج GitHub Actions. لا تمثل هذه الصفحة تطبيق المتعلم ولا تعلن جاهزية أي منصة قبل اجتياز اختبارات قبولها." data-en="A standalone view of documented implementation status, recent changes, and GitHub Actions. This is not the learner app and does not declare a platform ready before its acceptance tests pass.">لوحة مستقلة تعرض حالة التنفيذ الموثقة، وآخر التغييرات ونتائج GitHub Actions. لا تمثل هذه الصفحة تطبيق المتعلم ولا تعلن جاهزية أي منصة قبل اجتياز اختبارات قبولها.</p>
-      </div>
-      <div class="hero-side">
-        <span data-ar="الفرع التكاملي المستهدف" data-en="Target integration branch">الفرع التكاملي المستهدف</span>
-        <strong>implementation/full-build</strong>
-      </div>
-    </section>
+<div class="container">
+    <header>
+        <div>
+            <h1>Fluently-EH</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">لوحة المتابعة الحية للمشروع</p>
+        </div>
+        <div class="controls">
+            <div class="live-indicator">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">جارٍ الاتصال...</span>
+            </div>
+            <button class="icon-btn" id="theme-btn" title="تغيير المظهر">🌙</button>
+            <button class="icon-btn" id="refresh-btn" title="تحديث البيانات">🔄</button>
+        </div>
+    </header>
 
-    <div class="notice" role="note">
-      <span class="notice-icon" aria-hidden="true">i</span>
-      <p data-ar="مصدر الحالة التفصيلية هو docs/IMPLEMENTATION-STATUS.md في الفرع المستهدف. بيانات الالتزامات وطلبات الدمج وسير CI تُقرأ مباشرة من واجهة GitHub العامة؛ لا تستخدم الصفحة رموز وصول أو بيانات متعلمين." data-en="Detailed status is read from docs/IMPLEMENTATION-STATUS.md on the target branch. Commits, pull requests, and CI runs are read from GitHub's public API. This page uses no access tokens and does not read learner data.">مصدر الحالة التفصيلية هو docs/IMPLEMENTATION-STATUS.md في الفرع المستهدف. بيانات الالتزامات وطلبات الدمج وسير CI تُقرأ مباشرة من واجهة GitHub العامة؛ لا تستخدم الصفحة رموز وصول أو بيانات متعلمين.</p>
+    <div class="rules-box">
+        <span class="rule">🚫 لا IPA</span>
+        <span class="rule">🚫 لا تقييم صوتي</span>
+        <span class="rule">🚫 لا منافسات</span>
+        <span class="rule">✅ مجاني بالكامل</span>
+        <span class="rule">✅ يعمل دون اتصال</span>
     </div>
 
-    <section class="section" aria-labelledby="live-stats-title">
-      <div class="section-heading">
-        <div>
-          <h2 id="live-stats-title" data-ar="مؤشرات المستودع الحية" data-en="Live repository signals">مؤشرات المستودع الحية</h2>
-          <p data-ar="تُحدّث تلقائيًا كل 10 دقائق، ويمكنك التحديث يدويًا." data-en="Auto-refreshed every 10 minutes. You can also refresh manually.">تُحدّث تلقائيًا كل 10 دقائق، ويمكنك التحديث يدويًا.</p>
+    <!-- إحصائيات المستودع -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>النجوم (Stars)</h3>
+            <div class="stat-value" id="stat-stars">-</div>
         </div>
-        <a class="source-link" href="https://github.com/ammarcharef06/Fluently-EH" target="_blank" rel="noopener noreferrer" data-ar="فتح المستودع ↗" data-en="Open repository ↗">فتح المستودع ↗</a>
-      </div>
-      <div class="stats-grid">
-        <article class="stat-card">
-          <div class="stat-top">
-            <span class="stat-label" data-ar="الفرع الذي نتابعه" data-en="Tracked branch">الفرع الذي نتابعه</span>
-            <span class="stat-icon" aria-hidden="true">⌘</span>
-          </div>
-          <div class="stat-value ltr-value" id="branch-value">implementation/full-build</div>
-          <div class="stat-note" data-ar="فرع العمل المعتمد للتنفيذ التكاملي" data-en="Authorized integration branch">فرع العمل المعتمد للتنفيذ التكاملي</div>
-        </article>
-        <article class="stat-card">
-          <div class="stat-top">
-            <span class="stat-label" data-ar="طلبات الدمج المفتوحة" data-en="Open pull requests">طلبات الدمج المفتوحة</span>
-            <span class="stat-icon" aria-hidden="true">⇄</span>
-          </div>
-          <div class="stat-value" id="open-pr-value">—</div>
-          <div class="stat-note" id="open-pr-note" data-ar="من بيانات GitHub الحالية" data-en="From current GitHub data">من بيانات GitHub الحالية</div>
-        </article>
-        <article class="stat-card">
-          <div class="stat-top">
-            <span class="stat-label" data-ar="آخر نتيجة CI" data-en="Latest CI result">آخر نتيجة CI</span>
-            <span class="stat-icon" aria-hidden="true">✓</span>
-          </div>
-          <div class="stat-value" id="ci-value" data-ar="جارٍ الفحص" data-en="Loading">جارٍ الفحص</div>
-          <div class="stat-note" id="ci-note" data-ar="GitHub Actions على الفرع المستهدف" data-en="GitHub Actions on the target branch">GitHub Actions على الفرع المستهدف</div>
-        </article>
-        <article class="stat-card">
-          <div class="stat-top">
-            <span class="stat-label" data-ar="آخر تحديث برمجي" data-en="Latest code update">آخر تحديث برمجي</span>
-            <span class="stat-icon" aria-hidden="true">◷</span>
-          </div>
-          <div class="stat-value" id="commit-date-value">—</div>
-          <div class="stat-note" id="commit-note" data-ar="أحدث التزام في الفرع" data-en="Latest commit on the branch">أحدث التزام في الفرع</div>
-        </article>
-      </div>
-      <p class="error-note" id="api-error" role="status" aria-live="polite"></p>
-      <p class="refresh-stamp" id="last-refresh" aria-live="polite">—</p>
-    </section>
+        <div class="stat-card">
+            <h3>التفرعات (Forks)</h3>
+            <div class="stat-value" id="stat-forks">-</div>
+        </div>
+        <div class="stat-card">
+            <h3>المشاكل المفتوحة</h3>
+            <div class="stat-value" id="stat-issues">-</div>
+        </div>
+    </div>
 
-    <section class="section content-grid" aria-label="Project state">
-      <article class="panel">
-        <div class="section-heading">
-          <div>
-            <h2 data-ar="حالة مجالات التنفيذ" data-en="Implementation workstreams">حالة مجالات التنفيذ</h2>
-            <p data-ar="مستخرجة من سجل التنفيذ الرسمي في المستودع." data-en="Read from the repository's implementation status record.">مستخرجة من سجل التنفيذ الرسمي في المستودع.</p>
-          </div>
-          <a class="source-link" href="https://github.com/ammarcharef06/Fluently-EH/blob/implementation/full-build/docs/IMPLEMENTATION-STATUS.md" target="_blank" rel="noopener noreferrer" data-ar="مصدر الحالة ↗" data-en="Status source ↗">مصدر الحالة ↗</a>
+    <!-- بيانات CI والنشر -->
+    <div class="deploy-grid">
+        <div class="deploy-card">
+            <h3>آخر سير عمل (CI/CD)</h3>
+            <div class="deploy-value" id="ci-status">جارٍ الجلب...</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;" id="ci-name"></div>
         </div>
-        <div class="work-grid" id="work-grid">
-          <article class="work-card"><span class="work-label">Web/PWA</span><h4>واجهة أولية</h4><p>يتم تحميل سجل التنفيذ من المستودع...</p></article>
+        <div class="deploy-card">
+            <h3>حالة النشر (GitHub Pages)</h3>
+            <div class="deploy-value" id="pages-status">جارٍ الجلب...</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;" id="pages-link"></div>
         </div>
-      </article>
+    </div>
 
-      <aside class="panel">
-        <h2 data-ar="لقطة المنهج والاختبارات" data-en="Curriculum and test snapshot">لقطة المنهج والاختبارات</h2>
-        <p class="panel-intro" data-ar="قيم موثقة في سجل التنفيذ، وليست تقديرات حسابية." data-en="Facts documented in the status record, not calculated estimates.">قيم موثقة في سجل التنفيذ، وليست تقديرات حسابية.</p>
-        <div class="snapshot-list">
-          <div class="snapshot-item">
-            <span data-ar="المحتوى التعليمي" data-en="Learning content">المحتوى التعليمي</span>
-            <strong id="curriculum-value">3 مسودات • لا يوجد منشور</strong>
-          </div>
-          <div class="snapshot-item">
-            <span data-ar="محرك التقييم" data-en="Assessment engine">محرك التقييم</span>
-            <strong id="assessment-value">نواة مدمجة • 64 اختبار وحدة</strong>
-          </div>
-          <div class="snapshot-item">
-            <span data-ar="اختبار Android H2a" data-en="Android H2a">اختبار Android H2a</span>
-            <strong id="h2a-value">جزئي — تعثر المحاكي</strong>
-          </div>
-          <div class="snapshot-item">
-            <span data-ar="اختبار Android H4" data-en="Android H4">اختبار Android H4</span>
-            <strong id="h4-value">لم يبدأ</strong>
-          </div>
-          <div class="snapshot-item">
-            <span data-ar="تاريخ لقطة الوثيقة" data-en="Document snapshot date">تاريخ لقطة الوثيقة</span>
-            <strong id="snapshot-date">—</strong>
-          </div>
+    <!-- الخط الزمني للمراحل -->
+    <h2 style="font-size: 1.2rem; margin-bottom: 1rem;">الخط الزمني للمراحل</h2>
+    <div class="timeline" id="timeline">
+        <div class="phase-card">
+            <div class="phase-info"><h3>المرحلة 0: التوثيق</h3><p>PRD, ARCHITECTURE, DECISIONS</p></div>
+            <span class="status pending" id="phase_0">جارٍ التحميل</span>
         </div>
-        <div class="snapshot-foot" data-ar="لا تعرض اللوحة نسبة إنجاز كلية؛ لا توجد أوزان أو عتبات معتمدة تسمح بحسابها بأمانة." data-en="No overall completion percentage is shown: there are no approved weights or thresholds for calculating one reliably.">لا تعرض اللوحة نسبة إنجاز كلية؛ لا توجد أوزان أو عتبات معتمدة تسمح بحسابها بأمانة.</div>
-      </aside>
-    </section>
+        <div class="phase-card">
+            <div class="phase-info"><h3>المرحلة 1: إثبات الجدوى</h3><p>H2a, H2b, H4</p></div>
+            <span class="status pending" id="phase_1">جارٍ التحميل</span>
+        </div>
+        <div class="phase-card">
+            <div class="phase-info"><h3>المرحلة 2: أساس المستودع</h3><p>Monorepo & Packages</p></div>
+            <span class="status pending" id="phase_2">جارٍ التحميل</span>
+        </div>
+        <div class="phase-card">
+            <div class="phase-info"><h3>المرحلة 3: محرك المنهج</h3><p>Curriculum Engine</p></div>
+            <span class="status pending" id="phase_3">جارٍ التحميل</span>
+        </div>
+        <div class="phase-card">
+            <div class="phase-info"><h3>المرحلة 4: محرك التقييم</h3><p>Assessment Engine</p></div>
+            <span class="status pending" id="phase_4">جارٍ التحميل</span>
+        </div>
+        <div class="phase-card">
+            <div class="phase-info"><h3>المرحلة 5: الواجهات</h3><p>Web / Android / Windows</p></div>
+            <span class="status pending" id="phase_5">جارٍ التحميل</span>
+        </div>
+        <div class="phase-card">
+            <div class="phase-info"><h3>المرحلة 6+: الإطلاق</h3><p>المحتوى والاختبارات النهائية</p></div>
+            <span class="status pending" id="phase_6">جارٍ التحميل</span>
+        </div>
+    </div>
 
-    <section class="section" aria-labelledby="roadmap-title">
-      <div class="section-heading">
-        <div>
-          <h2 id="roadmap-title" data-ar="ترتيب بناء المنصات المعتمد" data-en="Approved platform sequence">ترتيب بناء المنصات المعتمد</h2>
-          <p data-ar="التسلسل صادر عن قرار E-14 بتاريخ 2026-11-02." data-en="This sequence follows decision E-14 dated 2026-11-02.">التسلسل صادر عن قرار E-14 بتاريخ 2026-11-02.</p>
-        </div>
-        <a class="source-link" href="https://github.com/ammarcharef06/Fluently-EH/blob/implementation/full-build/docs/DECISIONS.md" target="_blank" rel="noopener noreferrer" data-ar="سجل القرارات ↗" data-en="Decision log ↗">سجل القرارات ↗</a>
-      </div>
-      <div class="roadmap">
-        <article class="roadmap-card">
-          <span class="roadmap-number">01</span>
-          <h3 data-ar="Web/PWA وWindows" data-en="Web/PWA and Windows">Web/PWA وWindows</h3>
-          <p data-ar="الأولوية الحالية: تكامل حزم الواجهة، ثم إثبات الرحلات والاختبارات الفعلية لكل منصة." data-en="Current priority: integrate shared UI packages, then prove real user flows and platform tests.">الأولوية الحالية: تكامل حزم الواجهة، ثم إثبات الرحلات والاختبارات الفعلية لكل منصة.</p>
-          <span class="order-note" data-ar="الأولوية الأولى" data-en="First priority">الأولوية الأولى</span>
-        </article>
-        <article class="roadmap-card">
-          <span class="roadmap-number">02</span>
-          <h3 data-ar="Android" data-en="Android">Android</h3>
-          <p data-ar="يبدأ بعد استقرار Web وWindows واجتياز اختبارات قبولهما؛ نتيجة H2a الحالية لا تزال جزئية." data-en="Starts after Web and Windows stabilize and pass acceptance tests; the current H2a result remains partial.">يبدأ بعد استقرار Web وWindows واجتياز اختبارات قبولهما؛ نتيجة H2a الحالية لا تزال جزئية.</p>
-          <span class="order-note" data-ar="بعد استقرار المسارين الأولين" data-en="After the first two platforms stabilize">بعد استقرار المسارين الأولين</span>
-        </article>
-        <article class="roadmap-card">
-          <span class="roadmap-number">03</span>
-          <h3 data-ar="التحديث التلقائي للتطبيق" data-en="Automatic app updates">التحديث التلقائي للتطبيق</h3>
-          <p data-ar="يأتي أخيرًا بعد استقرار المنصات الثلاث؛ تحديث المحتوى يبقى مسارًا مستقلًا." data-en="Comes last, after all three platforms stabilize. Content updates remain a separate process.">يأتي أخيرًا بعد استقرار المنصات الثلاث؛ تحديث المحتوى يبقى مسارًا مستقلًا.</p>
-          <span class="order-note" data-ar="المرحلة الأخيرة" data-en="Final stage">المرحلة الأخيرة</span>
-        </article>
-      </div>
-    </section>
-
-    <section class="section" aria-labelledby="activity-title">
-      <div class="section-heading">
-        <div>
-          <h2 id="activity-title" data-ar="النشاط المباشر للمستودع" data-en="Live repository activity">النشاط المباشر للمستودع</h2>
-          <p data-ar="التغييرات والطلبات وسير الاختبارات المنشورة للعامة على GitHub." data-en="Public commits, pull requests, and workflow runs from GitHub.">التغييرات والطلبات وسير الاختبارات المنشورة للعامة على GitHub.</p>
-        </div>
-        <a class="source-link" href="https://github.com/ammarcharef06/Fluently-EH/actions" target="_blank" rel="noopener noreferrer" data-ar="كل عمليات CI ↗" data-en="All CI runs ↗">كل عمليات CI ↗</a>
-      </div>
-      <div class="activity-grid">
-        <article class="panel activity-panel">
-          <h3 data-ar="آخر الالتزامات" data-en="Recent commits">آخر الالتزامات</h3>
-          <div class="activity-list" id="commit-list"><p class="empty-state">جارٍ تحميل الالتزامات...</p></div>
-        </article>
-        <article class="panel activity-panel">
-          <h3 data-ar="طلبات الدمج المفتوحة" data-en="Open pull requests">طلبات الدمج المفتوحة</h3>
-          <div class="activity-list" id="pr-list"><p class="empty-state">جارٍ تحميل طلبات الدمج...</p></div>
-        </article>
-        <article class="panel activity-panel">
-          <h3 data-ar="آخر تشغيلات GitHub Actions" data-en="Latest GitHub Actions runs">آخر تشغيلات GitHub Actions</h3>
-          <div class="activity-list" id="run-list"><p class="empty-state">جارٍ تحميل نتائج CI...</p></div>
-        </article>
-      </div>
-      <div class="guardrails" aria-label="Project guardrails">
-        <span class="guardrail" data-ar="مجاني دون إعلانات أو اشتراكات" data-en="Free: no ads or subscriptions">مجاني دون إعلانات أو اشتراكات</span>
-        <span class="guardrail" data-ar="لا IPA ولا تقييم صوتي" data-en="No IPA or voice scoring">لا IPA ولا تقييم صوتي</span>
-        <span class="guardrail" data-ar="لا نشر دون اعتماد بشري" data-en="No publishing without human approval">لا نشر دون اعتماد بشري</span>
-        <span class="guardrail" data-ar="لا إعلان جاهزية دون دليل" data-en="No readiness claims without evidence">لا إعلان جاهزية دون دليل</span>
-      </div>
-    </section>
+    <!-- سجل التغييرات -->
+    <div class="commits-section">
+        <h2>آخر التحديثات البرمجية (Commits)</h2>
+        <div id="commit-list">جارٍ الجلب...</div>
+    </div>
 
     <footer>
-      <div class="shell footer-inner">
-        <p data-ar="هذه لوحة متابعة هندسية مستقلة للقراءة فقط. مرجع حالة التنفيذ هو المستودع نفسه؛ وقد يتأخر عرض GitHub API بسبب حدود الطلبات أو تعطل الشبكة. لا تمثل اللوحة إثبات قبول أو إعلان إطلاق." data-en="This is an independent, read-only engineering dashboard. The repository remains the source of truth; GitHub API limits or network issues may delay live data. This dashboard is not acceptance evidence or a launch announcement.">هذه لوحة متابعة هندسية مستقلة للقراءة فقط. مرجع حالة التنفيذ هو المستودع نفسه؛ وقد يتأخر عرض GitHub API بسبب حدود الطلبات أو تعطل الشبكة. لا تمثل اللوحة إثبات قبول أو إعلان إطلاق.</p>
-        <p><a href="https://github.com/ammarcharef06/Fluently-EH" target="_blank" rel="noopener noreferrer">GitHub • Fluently-EH</a></p>
-      </div>
+        <span id="last-updated">آخر تحديث: -</span>
+        <a href="https://github.com/ammarcharef06/Fluently-EH" target="_blank" style="color: var(--primary); text-decoration: none;">عرض المستودع على GitHub ↗</a>
     </footer>
-  </main>
+</div>
 
-  <script>
-    (function () {
-      'use strict';
+<script>
+    // --- الإعدادات ---
+    const OWNER = 'ammarcharef06';
+    const REPO = 'Fluently-EH';
+    const BRANCH = 'main'; // غيّر هذا إلى 'implementation/full-build' إذا كان الفرع النشط مختلفاً
+    const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}`;
+    const CACHE_KEY = 'fluently_dashboard_cache';
 
-      const OWNER = 'ammarcharef06';
-      const REPO = 'Fluently-EH';
-      const BRANCH = 'implementation/full-build';
-      const API_ROOT = 'https://api.github.com/repos/' + OWNER + '/' + REPO;
-      const STATUS_URL = 'https://raw.githubusercontent.com/' + OWNER + '/' + REPO + '/' + BRANCH + '/docs/IMPLEMENTATION-STATUS.md';
-      const REPO_URL = 'https://github.com/' + OWNER + '/' + REPO;
-      const REFRESH_INTERVAL = 10 * 60 * 1000;
-      let locale = 'ar';
-      let refreshing = false;
+    // --- عناصر DOM ---
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const themeBtn = document.getElementById('theme-btn');
+    const lastUpdatedSpan = document.getElementById('last-updated');
 
-      const copy = {
-        ar: {
-          connecting: 'تتصل ببيانات GitHub',
-          live: 'بيانات GitHub مباشرة',
-          partial: 'بيانات جزئية',
-          unavailable: 'تعذر تحديث البيانات الحية',
-          loading: 'جارٍ التحميل',
-          refresh: 'تحديث البيانات',
-          openPrs: 'من بيانات GitHub الحالية',
-          ciSuccess: 'اجتاز',
-          ciFailure: 'فشل',
-          ciPending: 'قيد التنفيذ',
-          ciUnknown: 'لا توجد نتيجة',
-          noCommits: 'لا توجد التزامات متاحة.',
-          noPrs: 'لا توجد طلبات دمج مفتوحة.',
-          noRuns: 'لا توجد تشغيلات CI ظاهرة.',
-          apiProblem: 'تعذر تحميل بعض بيانات GitHub. قد تكون هناك مشكلة شبكة أو حد مؤقت للطلبات؛ بقية اللوحة تظل متاحة.',
-          statusError: 'تعذر قراءة سجل التنفيذ مباشرة؛ تُعرض المعلومات الاحتياطية المضمنة في هذه الصفحة.',
-          commit: 'التزام',
-          updated: 'تحديث',
-          draft: 'مسودة',
-          merged: 'مُدمج',
-          open: 'مفتوح',
-          failed: 'فشل',
-          cancelled: 'أُلغي',
-          queued: 'في الانتظار',
-          snapshotUnknown: 'غير متاح',
-          curriculum: '3 مسودات • لا يوجد منشور',
-          assessment: 'نواة مدمجة • 64 اختبار وحدة',
-          h2a: 'جزئي — تعثر المحاكي',
-          h4: 'لم يبدأ',
-          statusLabel: 'الحالة الموثقة',
-          nextLabel: 'المطلوب قبل الاعتماد',
-          repoUpdated: 'آخر نشاط في المستودع',
-          noDate: 'غير متاح'
-        },
-        en: {
-          connecting: 'Connecting to GitHub',
-          live: 'Live GitHub data',
-          partial: 'Partial data',
-          unavailable: 'Live data could not be refreshed',
-          loading: 'Loading',
-          refresh: 'Refresh data',
-          openPrs: 'From current GitHub data',
-          ciSuccess: 'Passed',
-          ciFailure: 'Failed',
-          ciPending: 'In progress',
-          ciUnknown: 'No result',
-          noCommits: 'No commits are available.',
-          noPrs: 'There are no open pull requests.',
-          noRuns: 'No CI runs are visible.',
-          apiProblem: 'Some GitHub data could not be loaded. This may be a network issue or a temporary API limit; the rest of the dashboard remains available.',
-          statusError: 'The implementation status record could not be read; embedded fallback facts are shown.',
-          commit: 'commit',
-          updated: 'Updated',
-          draft: 'Draft',
-          merged: 'Merged',
-          open: 'Open',
-          failed: 'Failed',
-          cancelled: 'Cancelled',
-          queued: 'Queued',
-          snapshotUnknown: 'Unavailable',
-          curriculum: '3 drafts • none published',
-          assessment: 'Core merged • 64 unit tests',
-          h2a: 'Partial — emulator blocked',
-          h4: 'Not started',
-          statusLabel: 'Documented status',
-          nextLabel: 'Required before acceptance',
-          repoUpdated: 'Latest repository activity',
-          noDate: 'Unavailable'
+    // --- إدارة المظهر (Light/Dark) ---
+    const savedTheme = localStorage.getItem('fluently_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeBtn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+    themeBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('fluently_theme', newTheme);
+        themeBtn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    });
+
+    // --- دوال مساعدة ---
+    function timeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        if (seconds < 60) return 'منذ لحظات';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `منذ ${minutes} دقيقة`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `منذ ${hours} ساعة`;
+        return `منذ ${Math.floor(hours / 24)} يوم`;
+    }
+
+    function setLiveStatus(isLive, message) {
+        if (isLive) {
+            statusDot.className = 'status-dot live';
+            statusText.textContent = message || 'متصل';
+        } else {
+            statusDot.className = 'status-dot offline';
+            statusText.textContent = message || 'غير متصل';
         }
-      };
+    }
 
-      const fallbackRows = [
-        {
-          name: 'Web/PWA',
-          status: 'واجهة React/Vite أولية؛ لا يوجد دليل E2E على تنزيل حزمة المنهج كاملة أو استمرار رحلة التعلم Offline.',
-          next: 'تنزيل المنهج الكامل، واختبارات المتصفح والعمل دون اتصال والإخلاء والاستعادة والتحديث.'
-        },
-        {
-          name: 'Windows',
-          status: 'لم يبدأ تطبيق Tauri/desktop أو EXE. مسار H2b مفتوح للتنفيذ بقرار E-14 لكنه غير مثبت.',
-          next: 'تطبيق Windows وبناء وتثبيت وتشغيل فعلي وقراءة الحزمة المضمّنة واختبارات التلاعب.'
-        },
-        {
-          name: 'محرك المنهج',
-          status: 'نواة curriculum-engine مدمجة واجتازت فحوص CI الأساسية.',
-          next: 'استيراد ZIP والتحقق من توافق الحزم وتكامل التنزيل والتفعيل واختبارات المتصفح وOffline.'
-        },
-        {
-          name: 'محرك التقييم',
-          status: 'نواة assessment-engine مدمجة؛ اجتازت CI عدد 64 اختبار وحدة.',
-          next: 'مخططات وأسئلة ومعايرة بشرية وتكامل Web/PWA واختبارات تدفق تقييم حقيقي.'
-        },
-        {
-          name: 'Android',
-          status: 'Capacitor shell؛ نتيجة H2a جزئية، واختبار H4 لم يبدأ.',
-          next: 'يأتي بعد استقرار Web وWindows؛ ثم SQLite والحزمة المضمّنة واختبارات H2a/H4.'
-        },
-        {
-          name: 'المحتوى',
-          status: 'ثلاث مسودات فقط ولا توجد دروس منشورة أو حزمة منهج منشورة.',
-          next: 'مراجعة لغوية وتربوية وحقوقية بشرية واعتماد مخول.'
-        }
-      ];
-
-      function byId(id) {
-        return document.getElementById(id);
-      }
-
-      function text(id, value) {
-        const node = byId(id);
-        if (node) node.textContent = value;
-      }
-
-      function escapeHtml(value) {
-        return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
-          return {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-          }[char];
-        });
-      }
-
-      function safeGitHubUrl(value) {
+    // --- جلب البيانات وتحديث الواجهة ---
+    async function fetchDashboardData(isManual = false) {
+        if (isManual) refreshBtn.classList.add('spin');
+        
         try {
-          const parsed = new URL(value);
-          if (parsed.protocol === 'https:' && parsed.hostname === 'github.com') return parsed.href;
+            // إضافة طابع زمني لتجنب التخزين المؤقت للمتصفح
+            const t = Date.now();
+            
+            // جلب كل البيانات بشكل متوازٍ
+            const [repoRes, commitsRes, runsRes, pagesRes, statusRes] = await Promise.all([
+                fetch(`${API_BASE}?t=${t}`),
+                fetch(`${API_BASE}/commits?sha=${BRANCH}&per_page=5&t=${t}`),
+                fetch(`${API_BASE}/actions/runs?branch=${BRANCH}&per_page=1&t=${t}`),
+                fetch(`${API_BASE}/pages?t=${t}`),
+                fetch(`./status.json?t=${t}`)
+            ]);
+
+            const repoData = repoRes.ok ? await repoRes.json() : null;
+            const commitsData = commitsRes.ok ? await commitsRes.json() : null;
+            const runsData = runsRes.ok ? await runsRes.json() : null;
+            const pagesData = pagesRes.ok ? await pagesRes.json() : null;
+            const statusData = statusRes.ok ? await statusRes.json() : null;
+
+            // حفظ في التخزين المؤقت
+            const cacheData = { repoData, commitsData, runsData, pagesData, statusData, timestamp: Date.now() };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+
+            updateUI(cacheData, false);
+            setLiveStatus(true, 'متصل - بيانات حية');
+
         } catch (error) {
-          return REPO_URL;
+            console.error('Fetch error:', error);
+            // محاولة القراءة من التخزين المؤقت عند الفشل
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const cacheData = JSON.parse(cached);
+                updateUI(cacheData, true);
+                setLiveStatus(false, 'غير متصل - بيانات مؤرشفة');
+            } else {
+                setLiveStatus(false, 'غير متصل - لا توجد بيانات');
+            }
+        } finally {
+            if (isManual) setTimeout(() => refreshBtn.classList.remove('spin'), 500);
         }
-        return REPO_URL;
-      }
+    }
 
-      function formatDate(value) {
-        if (!value) return copy[locale].noDate;
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return copy[locale].noDate;
-        return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-DZ' : 'en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }).format(date);
-      }
-
-      function setLiveState(state) {
-        const pill = byId('live-pill');
-        pill.classList.toggle('offline', state !== 'live');
-        text('live-label', copy[locale][state] || copy[locale].partial);
-      }
-
-      function parseMarkdownTable(markdown) {
-        const lines = String(markdown || '').split(/\r?\n/);
-        const headerIndex = lines.findIndex(function (line) {
-          return line.includes('| المجال |') && line.includes('الحالة المثبتة') && line.includes('المطلوب قبل الاعتماد');
-        });
-        if (headerIndex < 0) return [];
-        const rows = [];
-        for (let index = headerIndex + 2; index < lines.length; index += 1) {
-          const line = lines[index].trim();
-          if (!line.startsWith('|')) break;
-          const cells = line.split('|').slice(1, -1).map(function (cell) {
-            return cell.trim().replace(/<[^>]*>/g, '');
-          });
-          if (cells.length >= 3) rows.push({ name: cells[0], status: cells[1], next: cells[2] });
+    // --- تحديث واجهة المستخدم ---
+    function updateUI(data, isOffline) {
+        // 1. الإحصائيات
+        if (data.repoData) {
+            document.getElementById('stat-stars').textContent = data.repoData.stargazers_count;
+            document.getElementById('stat-forks').textContent = data.repoData.forks_count;
+            document.getElementById('stat-issues').textContent = data.repoData.open_issues_count;
         }
-        return rows;
-      }
 
-      function renderWorkRows(rows) {
-        const root = byId('work-grid');
-        const safeRows = rows.length ? rows : fallbackRows;
-        root.innerHTML = safeRows.map(function (row) {
-          return '<article class="work-card">' +
-            '<span class="work-label">' + escapeHtml(copy[locale].statusLabel) + '</span>' +
-            '<h4>' + escapeHtml(row.name) + '</h4>' +
-            '<p>' + escapeHtml(row.status) + '</p>' +
-            '<p class="work-next"><strong>' + escapeHtml(copy[locale].nextLabel) + ':</strong> ' + escapeHtml(row.next) + '</p>' +
-            '</article>';
-        }).join('');
-      }
-
-      function updateDocumentFacts(markdown) {
-        const lines = String(markdown || '').split(/\r?\n/);
-        const snapshotLine = lines.find(function (line) { return line.includes('لقطة الحالة:'); });
-        if (snapshotLine) {
-          text('snapshot-date', snapshotLine.replace(/\*\*/g, '').replace('لقطة الحالة:', '').trim());
-        }
-        const curriculumLine = lines.find(function (line) { return line.includes('**المنهج:**'); });
-        if (curriculumLine && /ثلاث مسودات/.test(curriculumLine)) {
-          text('curriculum-value', copy[locale].curriculum);
-        }
-        const assessmentLine = lines.find(function (line) { return line.includes('packages/assessment-engine') && line.includes('64 اختبار وحدة'); });
-        if (assessmentLine) text('assessment-value', copy[locale].assessment);
-        const h2aLine = lines.find(function (line) { return line.includes('النتيجة:') && line.includes('جزئي'); });
-        if (h2aLine) text('h2a-value', copy[locale].h2a);
-        const h4Line = lines.find(function (line) { return line.includes('H4 لم يبدأ') || line.includes('H4 لم يبدأ'); });
-        if (h4Line) text('h4-value', copy[locale].h4);
-        renderWorkRows(parseMarkdownTable(markdown));
-      }
-
-      async function requestJson(path) {
-        const response = await fetch(API_ROOT + path, {
-          method: 'GET',
-          headers: { Accept: 'application/vnd.github+json' },
-          cache: 'no-store'
-        });
-        if (!response.ok) throw new Error('GitHub API ' + response.status);
-        return response.json();
-      }
-
-      async function requestStatusDocument() {
-        const response = await fetch(STATUS_URL, { cache: 'no-store' });
-        if (!response.ok) throw new Error('Status document ' + response.status);
-        return response.text();
-      }
-
-      function renderCommits(commits) {
-        const root = byId('commit-list');
-        if (!Array.isArray(commits) || commits.length === 0) {
-          root.innerHTML = '<p class="empty-state">' + escapeHtml(copy[locale].noCommits) + '</p>';
-          return;
-        }
-        root.innerHTML = commits.map(function (item) {
-          const message = String(item.commit && item.commit.message ? item.commit.message : '').split('\n')[0];
-          const date = item.commit && item.commit.author ? item.commit.author.date : '';
-          const shortSha = String(item.sha || '').slice(0, 7);
-          return '<a class="activity-item" href="' + escapeHtml(safeGitHubUrl(item.html_url)) + '" target="_blank" rel="noopener noreferrer">' +
-            '<span class="activity-title">' + escapeHtml(message || shortSha) + '</span>' +
-            '<span class="activity-meta"><span>' + escapeHtml(shortSha) + '</span><span>' + escapeHtml(formatDate(date)) + '</span></span>' +
-            '</a>';
-        }).join('');
-      }
-
-      function renderPullRequests(pulls) {
-        const root = byId('pr-list');
-        const openPulls = Array.isArray(pulls) ? pulls.filter(function (item) { return item.state === 'open'; }) : [];
-        text('open-pr-value', String(openPulls.length));
-        if (openPulls.length === 0) {
-          root.innerHTML = '<p class="empty-state">' + escapeHtml(copy[locale].noPrs) + '</p>';
-          return;
-        }
-        root.innerHTML = openPulls.map(function (item) {
-          const label = item.draft ? copy[locale].draft : copy[locale].open;
-          return '<a class="activity-item" href="' + escapeHtml(safeGitHubUrl(item.html_url)) + '" target="_blank" rel="noopener noreferrer">' +
-            '<span class="activity-title">#' + escapeHtml(item.number) + ' — ' + escapeHtml(item.title) + '</span>' +
-            '<span class="activity-meta"><span class="mini-tag">' + escapeHtml(label) + '</span><span>' + escapeHtml(copy[locale].updated) + ': ' + escapeHtml(formatDate(item.updated_at)) + '</span></span>' +
-            '</a>';
-        }).join('');
-      }
-
-      function runState(run) {
-        if (run.status !== 'completed') return { label: copy[locale].ciPending, css: 'pending' };
-        if (run.conclusion === 'success') return { label: copy[locale].ciSuccess, css: 'success' };
-        if (run.conclusion === 'failure' || run.conclusion === 'timed_out') return { label: copy[locale].ciFailure, css: 'failure' };
-        if (run.conclusion === 'cancelled') return { label: copy[locale].cancelled, css: 'pending' };
-        return { label: run.conclusion || copy[locale].ciUnknown, css: 'pending' };
-      }
-
-      function renderRuns(payload) {
-        const runs = payload && Array.isArray(payload.workflow_runs) ? payload.workflow_runs : [];
-        const root = byId('run-list');
-        if (runs.length === 0) {
-          text('ci-value', copy[locale].ciUnknown);
-          root.innerHTML = '<p class="empty-state">' + escapeHtml(copy[locale].noRuns) + '</p>';
-          return;
-        }
-        const latest = runs[0];
-        const latestState = runState(latest);
-        text('ci-value', latestState.label);
-        text('ci-note', String(latest.name || 'GitHub Actions') + ' • ' + formatDate(latest.updated_at || latest.created_at));
-        root.innerHTML = runs.slice(0, 5).map(function (run) {
-          const state = runState(run);
-          return '<a class="activity-item" href="' + escapeHtml(safeGitHubUrl(run.html_url)) + '" target="_blank" rel="noopener noreferrer">' +
-            '<span class="activity-title">' + escapeHtml(run.name || 'GitHub Actions') + '</span>' +
-            '<span class="activity-meta"><span class="mini-tag ' + state.css + '">' + escapeHtml(state.label) + '</span><span>' + escapeHtml(formatDate(run.updated_at || run.created_at)) + '</span></span>' +
-            '</a>';
-        }).join('');
-      }
-
-      async function refresh() {
-        if (refreshing) return;
-        refreshing = true;
-        const button = byId('refresh-button');
-        button.disabled = true;
-        text('api-error', '');
-        setLiveState('connecting');
-
-        const jobs = await Promise.allSettled([
-          requestJson('/commits?sha=' + encodeURIComponent(BRANCH) + '&per_page=5'),
-          requestJson('/pulls?state=open&sort=updated&direction=desc&per_page=10'),
-          requestJson('/actions/runs?branch=' + encodeURIComponent(BRANCH) + '&per_page=5'),
-          requestStatusDocument()
-        ]);
-
-        let good = 0;
-        if (jobs[0].status === 'fulfilled') {
-          renderCommits(jobs[0].value);
-          if (jobs[0].value.length > 0) {
-            const latestCommit = jobs[0].value[0];
-            const date = latestCommit.commit && latestCommit.commit.author ? latestCommit.commit.author.date : '';
-            text('commit-date-value', formatDate(date));
-            const message = latestCommit.commit && latestCommit.commit.message ? latestCommit.commit.message.split('\n')[0] : '';
-            text('commit-note', message || copy[locale].commit);
-          }
-          good += 1;
+        // 2. الـ CI
+        const ciEl = document.getElementById('ci-status');
+        const ciNameEl = document.getElementById('ci-name');
+        if (data.runsData && data.runsData.workflow_runs && data.runsData.workflow_runs.length > 0) {
+            const run = data.runsData.workflow_runs[0];
+            if (run.status === 'completed') {
+                if (run.conclusion === 'success') { ciEl.textContent = '✅ نجح'; ciEl.className = 'deploy-value text-success'; }
+                else if (run.conclusion === 'failure') { ciEl.textContent = '❌ فشل'; ciEl.className = 'deploy-value text-danger'; }
+                else { ciEl.textContent = '⏹️ ' + run.conclusion; ciEl.className = 'deploy-value text-warning'; }
+            } else {
+                ciEl.textContent = '⏳ قيد التنفيذ'; ciEl.className = 'deploy-value text-warning';
+            }
+            ciNameEl.textContent = `${run.name} - ${timeAgo(run.updated_at)}`;
         } else {
-          renderCommits([]);
+            ciEl.textContent = 'ℹ️ لا توجد بيانات'; ciEl.className = 'deploy-value';
         }
 
-        if (jobs[1].status === 'fulfilled') {
-          renderPullRequests(jobs[1].value);
-          good += 1;
+        // 3. حالة النشر
+        const pagesEl = document.getElementById('pages-status');
+        const pagesLinkEl = document.getElementById('pages-link');
+        if (data.pagesData) {
+            if (data.pagesData.status === 'built') {
+                pagesEl.textContent = '✅ منشور'; pagesEl.className = 'deploy-value text-success';
+                pagesLinkEl.innerHTML = `<a href="${data.pagesData.html_url}" target="_blank" style="color:var(--primary);">زيارة الموقع ↗</a>`;
+            } else if (data.pagesData.status === 'building') {
+                pagesEl.textContent = '⏳ جارٍ النشر'; pagesEl.className = 'deploy-value text-warning';
+            } else if (data.pagesData.status === 'errored') {
+                pagesEl.textContent = '❌ فشل'; pagesEl.className = 'deploy-value text-danger';
+            } else {
+                pagesEl.textContent = 'ℹ️ غير مفعل'; pagesEl.className = 'deploy-value';
+            }
+        }
+
+        // 4. الخط الزمني (من status.json)
+        if (data.statusData) {
+            for (let i = 0; i <= 6; i++) {
+                const phaseKey = `phase_${i}`;
+                const el = document.getElementById(phaseKey);
+                if (el && data.statusData[phaseKey]) {
+                    const pData = data.statusData[phaseKey];
+                    el.textContent = pData.text;
+                    el.className = `status ${pData.status}`;
+                }
+            }
+        }
+
+        // 5. سجل الـ Commits
+        const commitList = document.getElementById('commit-list');
+        if (data.commitsData && data.commitsData.length > 0) {
+            commitList.innerHTML = data.commitsData.map(commit => `
+                <div class="commit-item">
+                    <span class="commit-sha">${commit.sha.substring(0, 7)}</span>
+                    <span class="commit-msg" title="${commit.commit.message}">${commit.commit.message.split('\n')[0]}</span>
+                    <span class="commit-date">${timeAgo(commit.commit.author.date)}</span>
+                </div>
+            `).join('');
         } else {
-          text('open-pr-value', '—');
-          byId('pr-list').innerHTML = '<p class="empty-state">' + escapeHtml(copy[locale].apiProblem) + '</p>';
+            commitList.textContent = 'لا توجد تحديثات.';
         }
 
-        if (jobs[2].status === 'fulfilled') {
-          renderRuns(jobs[2].value);
-          good += 1;
-        } else {
-          text('ci-value', copy[locale].ciUnknown);
-          byId('run-list').innerHTML = '<p class="empty-state">' + escapeHtml(copy[locale].apiProblem) + '</p>';
-        }
+        // 6. وقت آخر تحديث
+        const timestamp = isOffline ? data.timestamp : Date.now();
+        lastUpdatedSpan.textContent = `آخر تحديث: ${timeAgo(new Date(timestamp).toISOString())} ${isOffline ? '(مؤرشف)' : ''}`;
+    }
 
-        if (jobs[3].status === 'fulfilled') {
-          updateDocumentFacts(jobs[3].value);
-          good += 1;
-        } else {
-          renderWorkRows(fallbackRows);
-          text('snapshot-date', '2026-11-02');
-          text('api-error', copy[locale].statusError);
-        }
+    // --- بدء التشغيل ---
+    refreshBtn.addEventListener('click', () => fetchDashboardData(true));
+    fetchDashboardData();
+    setInterval(() => fetchDashboardData(), 300000); // تحديث تلقائي كل 5 دقائق
+</script>
 
-        if (good === 4) {
-          setLiveState('live');
-        } else {
-          setLiveState('partial');
-          if (!byId('api-error').textContent) text('api-error', copy[locale].apiProblem);
-        }
-
-        text('last-refresh', (locale === 'ar' ? 'آخر تحديث: ' : 'Last refreshed: ') + formatDate(new Date().toISOString()));
-        refreshing = false;
-        button.disabled = false;
-      }
-
-      function applyLocale() {
-        document.documentElement.lang = locale;
-        document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
-        document.querySelectorAll('[data-ar][data-en]').forEach(function (node) {
-          node.textContent = node.getAttribute('data-' + locale) || '';
-        });
-        text('language-button', locale === 'ar' ? 'EN' : 'عربي');
-        text('refresh-button', copy[locale].refresh);
-        text('commit-date-value', byId('commit-date-value').textContent || '—');
-        const snapshot = byId('snapshot-date').textContent;
-        if (!snapshot || snapshot === '—') text('snapshot-date', copy[locale].snapshotUnknown);
-      }
-
-      byId('refresh-button').addEventListener('click', refresh);
-      byId('language-button').addEventListener('click', function () {
-        locale = locale === 'ar' ? 'en' : 'ar';
-        applyLocale();
-        refresh();
-      });
-
-      applyLocale();
-      renderWorkRows(fallbackRows);
-      text('last-refresh', copy[locale].loading);
-      refresh();
-      window.setInterval(function () {
-        if (!document.hidden) refresh();
-      }, REFRESH_INTERVAL);
-    })();
-  </script>
 </body>
 </html>
