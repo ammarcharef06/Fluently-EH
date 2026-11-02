@@ -283,6 +283,8 @@ importers:
         specifier: 6.1.2
         version: 6.1.2(vite@8.3.5(@types/node@22.13.10)(esbuild@0.28.2))
 
+  packages/assessment-engine: {}
+
   packages/content-schema:
     dependencies:
       zod:
@@ -304,7 +306,13 @@ importers:
         specifier: workspace:*
         version: link:../content-schema
 
-  packages/domain: {}
+  packages/domain:
+    dependencies:
+      '@fluently/assessment-engine':
+        specifier: workspace:*
+        version: link:../assessment-engine
+
+  packages/i18n: {}
 
   packages/storage-native:
     dependencies:
