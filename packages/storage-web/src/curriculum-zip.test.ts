@@ -290,9 +290,9 @@ describe('curriculum ZIP import', () => {
 
   it('rejects changed file bytes when the embedded and trusted manifests retain the original hash', async () => {
     const packageId = 'fluently.test.zip.hash.' + crypto.randomUUID();
-    const originalFiles: PackageFiles = { 'content.json': strToU8('{"lessons":[]}') };
+    const originalFiles: PackageFiles = { 'content.json': strToU8('original') };
     const manifest = await createManifest(packageId, originalFiles);
-    const changedFiles: PackageFiles = { 'content.json': strToU8('{"lessons":[1]}') };
+    const changedFiles: PackageFiles = { 'content.json': strToU8('altered!') };
     const archive = createZip(manifest, changedFiles);
 
     const result = await importCurriculumZip(archive, manifest);
@@ -449,13 +449,10 @@ describe('curriculum ZIP import', () => {
     const activeArchive = createZip(activeManifest, activeFiles);
     expect((await importCurriculumZip(activeArchive, activeManifest)).ok).toBe(true);
 
-    const changedFiles: PackageFiles = { 'content.json': strToU8('candidate-v2') };
-    const candidateManifest = await createManifest(packageId, changedFiles);
-    const untrustedCandidate = {
-      ...candidateManifest,
-      files: candidateManifest.files.map((file) => ({ ...file, sha256: '0'.repeat(64) }))
-    };
-    const candidateArchive = createZip(untrustedCandidate, changedFiles);
+    const candidateFiles: PackageFiles = { 'content.json': strToU8('candidate-v2') };
+    const candidateManifest = await createManifest(packageId, candidateFiles);
+    const alteredCandidateFiles: PackageFiles = { 'content.json': strToU8('candidate-vX') };
+    const candidateArchive = createZip(candidateManifest, alteredCandidateFiles);
     const failed = await importCurriculumZip(candidateArchive, candidateManifest);
 
     expect(failed).toMatchObject({ ok: false, reason: 'integrity_failed' });
