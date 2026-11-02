@@ -34,7 +34,7 @@ async function createManifest(packageId: string, files: PackageFiles) {
   };
 }
 
-function createZip(embeddedManifest: unknown, files: PackageFiles, level = 6): Uint8Array {
+function createZip(embeddedManifest: unknown, files: PackageFiles, level: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 = 6): Uint8Array {
   const entries: Record<string, Uint8Array> = {
     'manifest.json': strToU8(JSON.stringify(embeddedManifest))
   };
