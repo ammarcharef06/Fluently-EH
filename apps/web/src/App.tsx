@@ -18,6 +18,7 @@ import {
 import { LessonSchema, type Lesson } from '@fluently/content-schema';
 import { clearLocalLearningData, readSetting, saveSetting } from '@fluently/storage-web';
 import { downloadAndActivateCurriculum, readActiveCurriculumPackage } from '@fluently/storage-web/curriculum';
+import { downloadAndActivateCurriculumZip } from '@fluently/storage-web/curriculum-download';
 import { syncPendingOperations } from '@fluently/storage-web/sync';
 
 type Screen = 'home' | 'path' | 'lesson' | 'review' | 'settings';
@@ -137,8 +138,14 @@ function App() {
         setSignedIn(true);
         const localReady = await loadLocalPackage();
         if (!localReady) {
-          const downloaded = await downloadAndActivateCurriculum();
-          if (downloaded.ok) await loadLocalPackage();
+          const downloaded = await downloadAndActivateCurriculumZip();
+          if (downloaded.ok) {
+            await loadLocalPackage();
+          } else if (downloaded.reason === 'archive_unavailable') {
+            // Older releases may still expose the manifest-declared file transport.
+            const legacyDownload = await downloadAndActivateCurriculum();
+            if (legacyDownload.ok) await loadLocalPackage();
+          }
         }
         return;
       }
