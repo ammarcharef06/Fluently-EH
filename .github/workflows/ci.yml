@@ -44,9 +44,9 @@ jobs:
         run: pnpm run build
 
   windows-h2b-environment:
-    name: H2b Windows toolchain and WebView2
+    name: H2b Windows build, install and runtime smoke
     runs-on: windows-2025
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -148,6 +148,35 @@ jobs:
       - name: Install pinned Tauri CLI
         run: npm install --global @tauri-apps/cli@2.12.4
 
+      - name: Install pinned NSIS toolchain
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          choco install nsis --version=3.13.0 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            throw "NSIS installation failed with exit code $LASTEXITCODE."
+          }
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (!$makensis) {
+            $candidates = @(
+              (Join-Path "${env:ProgramFiles(x86)}" "NSIS\makensis.exe"),
+              (Join-Path $env:ProgramFiles "NSIS\makensis.exe")
+            )
+            $makensisPath = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+            if (!$makensisPath) {
+              throw "makensis.exe was not found after installing NSIS."
+            }
+            Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $makensisPath)
+            $makensisPath = $makensisPath
+          } else {
+            $makensisPath = $makensis.Source
+          }
+          & $makensisPath /VERSION
+          if ($LASTEXITCODE -ne 0) {
+            throw "NSIS version probe failed."
+          }
+
+
       - name: Generate temporary Windows build icon
         shell: pwsh
         run: |
@@ -172,17 +201,38 @@ jobs:
         working-directory: apps/desktop/src-tauri
         run: cargo check --locked --target x86_64-pc-windows-msvc
 
-      - name: Build Windows QA executable
+      - name: Build Windows QA installer and executable
         working-directory: apps/desktop/src-tauri
-        run: tauri build --no-bundle
+        run: tauri build
 
-      - name: Upload unsigned Windows QA executable
+      - name: Install and launch Windows QA application
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installerDirectory = Join-Path $env:GITHUB_WORKSPACE "apps/desktop/src-tauri/target/release/bundle/nsis"
+          $installers = @(Get-ChildItem -Path $installerDirectory -Filter "*-setup.exe" -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS setup executable; found $($installers.Count)."
+          }
+          pwsh -NoProfile -ExecutionPolicy Bypass -File "scripts/windows/qa-install-smoke.ps1" -InstallerPath $installers[0].FullName
+
+      - name: Upload unsigned Windows QA installer and executable
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: fluently-windows-unsigned-qa
-          path: apps/desktop/src-tauri/target/release/fluently-desktop.exe
+          path: |
+            apps/desktop/src-tauri/target/release/fluently-desktop.exe
+            apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload Windows install/runtime smoke evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: h2b-windows-install-smoke
+          path: h2b-windows-install-smoke.txt
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Archive committed Cargo lockfile for build evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

@@ -1,6 +1,6 @@
 # سجل التنفيذ التكاملي — Fluently
 
-**لقطة الحالة:** 2026-11-02  
+**لقطة الحالة:** 2026-11-03  
 **الفرع المستهدف:** `implementation/full-build`  
 **تفويض التنفيذ:** DECISIONS E-11 (2026-11-01) وE-14 (2026-11-02).  
 **الحالة العامة:** تنفيذ جزئي قيد البناء؛ لا يوجد إعلان جاهزية لأي منصة أو إطلاق.
@@ -10,7 +10,7 @@
 - أُعدّ Monorepo باستخدام pnpm `12.16.1` وملف `pnpm-workspace.yaml`، وأُنشئ `pnpm-lock.yaml` بواسطة سير عمل منفصل.
 - اجتاز تشغيل CI رقم [41457643533](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41457643533) التثبيت المجمد، وTypeScript، واختبارات الوحدات، وLint، وفحص الأسرار، وتدقيق الاعتماديات، وفحص مسودات المحتوى، وبناء Web وAdmin. هذا دليل CI للالتزام `93128d0868455191864d77af9e0bafddffdffa59`، وليس دليلًا على تشغيل المنصات أو جاهزيتها.
 - اجتاز سير إنشاء ملف القفل [41457643542](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41457643542)، ثم أُضيف `pnpm-lock.yaml` في الالتزام `9f0054bd7ad329c3731a924163a1bb79335cca12`.
-- توجد تطبيقات Workspace أولية: `apps/web` و`apps/admin` و`apps/android`. لا يوجد مجلد `apps/desktop` ولا تطبيق Tauri حاليًا.
+- توجد تطبيقات Workspace أولية: `apps/web` و`apps/admin` و`apps/android`، وأضيف `apps/desktop` كتطبيق Tauri 2 في PR #26.
 
 ## ما تثبته الشيفرة الحالية
 
@@ -25,7 +25,7 @@
 - **قاعدة البيانات:** يوجد ترحيل PostgreSQL أولي وسياسات RLS في ملف SQL؛ لم يقدم المستودع دليلًا على تطبيق migration على قاعدة فعلية أو اختبار عزل مستخدمين أو نسخ احتياطي.
 - **التخزين الأصلي:** `packages/storage-native` يحتوي تعريف حزمة واعتماديات فقط، بينما مسار export يشير إلى `src/index.ts` غير الموجود في الفرع. لا يوجد Adapter SQLite مكتمل.
 - **Android:** يوجد Capacitor shell وإعداداته، لكنه لا يثبت تنفيذ SQLite أو تضمين المنهج المنشور أو دورة حياة التطبيق. نتيجة H2a التاريخية جزئية كما أدناه؛ H4 لم يبدأ.
-- **Windows:** أضيف هيكل Tauri 2 في `apps/desktop/src-tauri` وربط إعداداته بواجهة `apps/web`، وأضيف CI لبناء EXE غير موقع على Windows 2025. هذه خطوة scaffold/build فقط؛ لا يوجد بعد SQLite أصلي أو حزمة منهج مضمّنة أو اختبار تثبيت/runtime/tamper، ولا Authenticode. لا يزال H2b غير مُثبت حتى اجتياز هذه الاختبارات.
+- **Windows:** أضيف هيكل Tauri 2 في `apps/desktop/src-tauri` وربط إعداداته بواجهة `apps/web` عبر PR #26. في PR #27 أضيف بناء NSIS غير موقع بوضع `currentUser` واختبار CI آلي لتثبيت التطبيق وتشغيله والتحقق من نافذته على `windows-2025`. نجح CI run [41672340401](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41672340401) على commit `df6699164d6c2550c5a6b1e1d9905034afa4893f`، وأنتج مثبتًا وEXE غير موقعين وتقرير smoke test؛ هذا يثبت التثبيت وظهور نافذة التطبيق على runner فقط، ولا يثبت SQLite أو المنهج أو tamper. لا يوجد بعد SQLite أصلي أو حزمة منهج مضمّنة أو اختبار runtime checksum/tamper أو Authenticode. لا يزال H2b غير مُثبت.
 - **الحزم المشتركة:** `packages/curriculum-engine` نواة أولية مدمجة عبر PR #5. دُمجت `packages/i18n` عبر PR #9 وتكاملت الآن مع واجهتي `apps/web` و`apps/admin`؛ تغطي اختبارات jsdom تبديل اللغة واستعادة التفضيل وتحديث lang/dir، بينما تظل اختبارات المتصفح الفعلية مفتوحة. دُمجت نواة `packages/assessment-engine` عبر PR #11 واجتازت CI run [41479100420](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41479100420). أُضيف اعتماد مباشر لمحرك التقييم في `apps/web` لتصحيح خطوات الاختيار الموجودة، مع اختبار تدفق على مسودة الضمائر؛ يظل هذا تكاملًا جزئيًا للتصحيح والتغذية الراجعة فقط. مخطط المحتوى الحالي لا يتضمن hints أو أمثلة علاجية أو بيانات remedial، ولا توجد مخططات إتقان/معايرة إنتاجية معتمدة؛ لذلك لم يُفعّل text grading أو hints أو mastery أو placement في واجهة المتعلم.
 
 ## بوابات لم تُجتز بعد
@@ -33,7 +33,7 @@
 | المجال | الحالة المثبتة | المطلوب قبل الاعتماد |
 |---|---|---|
 | Web/PWA | واجهة أولية وCI build | تنزيل المنهج الكامل، واختبارات browser/Offline/eviction/restore/update |
-| Windows | Tauri shell مضاف؛ CI بنى EXE غير موقع بنجاح؛ لم يثبت التثبيت أو runtime أو قراءة الحزمة المضمّنة أو tamper | تطبيق Windows، بناء وتثبيت وتشغيل فعلي، قراءة الحزمة المضمّنة، tamper tests، وتوثيق حالة Authenticode |
+| Windows | Tauri shell وEXE QA؛ نجح NSIS install/launch smoke على windows-2025 في CI run [41672340401](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41672340401) | H2b-4: قراءة حزمة المنهج المضمّنة والتحقق من SHA-256 ورفض tamper؛ H2b-5: SQLite وتقدم المتعلم؛ توثيق Authenticode أو عدم توفره وبصمات QA |
 | محرك المنهج والحزم | نواة `curriculum-engine` وقارئ/منشئ ZIP32 مدمجان في الفروع التي اجتازت CI الخاصة بها | توصيل تنزيل ZIP وتفعيله بواجهة المتعلم، تحقق دلالي للمحتوى، توافق إصدار التطبيق، واختبارات متصفح وOffline؛ لم توجد حزمة معتمدة للاختبار الفعلي |
 | محرك التقييم | نواة `packages/assessment-engine` مدمجة؛ أُضيف تكامل مباشر لـ`gradeChoice` في `apps/web` مع اختبار تدفق لسؤال الضمائر الحالي | إضافة مخططات أسئلة معتمدة للأنواع الأخرى وحقول hints/الأمثلة عند مراجعتها، ثم تعريف معايرة بشرية صريحة قبل mastery/placement؛ اختبارات متصفح فعلية؛ لا تقييم صوتي |
 | Android | Capacitor shell؛ H2a جزئي | يأتي بعد استقرار Web/Windows؛ SQLite والحزمة المضمّنة وlifecycle ثم H2a/H4 |
