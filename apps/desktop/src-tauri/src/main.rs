@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use sha2::{Digest, Sha256};
-use std::{fs, io, io::Read, path::Path};
+use std::{fs, io::Read, path::Path};
 use tauri::{path::BaseDirectory, Manager};
 
 const TRUSTED_MANIFEST_SHA256: &str =
@@ -120,7 +120,12 @@ fn verify_embedded_curriculum(app: &tauri::AppHandle) -> Result<(), String> {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            verify_embedded_curriculum(app.handle()).map_err(io::Error::other)?;
+            if let Err(error) = verify_embedded_curriculum(app.handle()) {
+                eprintln!("Fluently startup blocked: {error}");
+                // The application must never continue after an integrity failure.
+                // This runs before the first window is created and before learner data is opened.
+                std::process::exit(1);
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
