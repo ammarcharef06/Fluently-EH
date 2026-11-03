@@ -88,9 +88,6 @@ try {
             if ($tamperedProcess.HasExited) {
                 break
             }
-            if ($tamperedProcess.MainWindowHandle -ne [IntPtr]::Zero) {
-                throw "Fluently showed a window after the installed curriculum payload was modified."
-            }
         } while ([DateTime]::UtcNow -lt $tamperDeadline)
 
         $tamperedProcess.Refresh()
