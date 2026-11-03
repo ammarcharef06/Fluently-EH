@@ -34,7 +34,7 @@
 | SEC-001 | لا توجد أسرار أو مفاتيح توقيع أو بيانات شخصية داخل المستودع أو حزم المحتوى العامة | AGENTS §1 و§3، SECURITY-AND-PRIVACY | DECISIONS 85–91 | كل بوابة | SEC-001: secret scan + review | مخطط |
 | UPD-001 | يتحدث المحتوى مستقلًا عن التطبيق عندما يكون schema متوافقًا، مع رفض النسخة غير المتوافقة | ARCHITECTURE §9، OFFLINE-AND-SYNC §6 | DECISIONS 100، 122، 123 | P1 ثم P4/P10 | P1-UPD-001: min/max schema compatibility probe | مخطط |
 | AND-001 | يوقع APK بمفتاح إصدار ثابت، ويؤكد المستخدم التثبيت عبر النظام | PLATFORM-REQUIREMENTS §3، RELEASE-AND-TESTING §8 | DECISIONS 113 | P1 prototype؛ P10 release | P1-AND-001: بناء/توقيع تجريبي بلا أسرار؛ P10: ترقية على جهاز فعلي | مخطط |
-| WIN-001 | تحفظ بيانات Windows في مساحة المستخدم، وتتحقق سلامة التحديث دون فتح منفذ وارد | PLATFORM-REQUIREMENTS §4 | DECISIONS 73، 95؛ DECISIONS §E-14 | مسار Windows الأول؛ التحديث التلقائي في المرحلة الأخيرة | Windows runner وRust/Tauri؛ تثبيت/تشغيل؛ اختبار الحزمة المضمّنة والتلاعب؛ توثيق Authenticode أو عدم توفره وبصمات QA | Tauri shell وCI build غير موقع مضافان؛ التخزين والتثبيت/runtime والتلاعب والتحديث لم تُختبر |
+| WIN-001 | تحفظ بيانات Windows في مساحة المستخدم، وتتحقق سلامة التحديث دون فتح منفذ وارد | PLATFORM-REQUIREMENTS §4 | DECISIONS 73، 95؛ DECISIONS §E-14 | مسار Windows الأول؛ التحديث التلقائي في المرحلة الأخيرة | Windows runner وRust/Tauri؛ تثبيت/تشغيل؛ اختبار الحزمة المضمّنة والتلاعب؛ توثيق Authenticode أو عدم توفره وبصمات QA | Tauri shell وEXE QA؛ أضيف بناء NSIS واختبار تثبيت/نافذة تشغيل على Windows runner، والنتيجة تنتظر CI؛ الحزمة المضمّنة والتلاعب والتحديث لم تُختبر |
 
 ## سجل نتائج المرحلة 1
 
