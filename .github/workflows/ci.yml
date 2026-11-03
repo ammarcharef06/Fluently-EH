@@ -197,6 +197,10 @@ jobs:
             $bitmap.Dispose()
           }
 
+      - name: Verify embedded curriculum integrity tests
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --locked --target x86_64-pc-windows-msvc
+
       - name: Verify Cargo dependencies against committed lockfile
         working-directory: apps/desktop/src-tauri
         run: cargo check --locked --target x86_64-pc-windows-msvc

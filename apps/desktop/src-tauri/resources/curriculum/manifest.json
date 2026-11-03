@@ -1,0 +1,22 @@
+{
+  "packageId": "fluently-h2b4-integrity-fixture",
+  "contentVersion": "0.0.0-h2b4-test",
+  "schemaVersion": 1,
+  "minAppVersion": "0.1.0",
+  "maxAppVersion": null,
+  "generatedAt": "2026-11-03T00:00:00.000Z",
+  "files": [
+    {
+      "path": "lessons/pre-a1-integrity-fixture.json",
+      "bytes": 1027,
+      "sha256": "6f4109564c2b554f692e543886ea7158a3b44e931424ad3da638dfb76d77295d"
+    }
+  ],
+  "rights": [
+    {
+      "asset": "lessons/pre-a1-integrity-fixture.json",
+      "license": "CC0-1.0",
+      "attribution": "Original technical test fixture; not approved for learner release."
+    }
+  ]
+}
