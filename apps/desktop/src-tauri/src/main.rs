@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use sha2::{Digest, Sha256};
-use std::{error::Error, fs, io, path::PathBuf};
+use std::{fs, io};
 use tauri::{path::BaseDirectory, Manager};
 
 const TRUSTED_MANIFEST_SHA256: &str =
@@ -77,15 +77,16 @@ fn verify_curriculum_payload(manifest_bytes: &[u8], lesson_bytes: &[u8]) -> Resu
     Ok(())
 }
 
-fn verify_embedded_curriculum(app: &tauri::AppHandle) -> Result<(), Box<dyn Error>> {
-    let resource_root: PathBuf = app.path().resolve("curriculum", BaseDirectory::Resource)?;
+fn verify_embedded_curriculum(app: &tauri::AppHandle) -> Result<(), String> {
+    let resource_root = app.path()
+        .resolve("curriculum", BaseDirectory::Resource)
+        .map_err(|error| error.to_string())?;
     let manifest_path = resource_root.join("manifest.json");
     let lesson_path = resource_root.join(EXPECTED_LESSON_PATH);
 
-    let manifest_bytes = fs::read(&manifest_path)?;
-    let lesson_bytes = fs::read(&lesson_path)?;
-    verify_curriculum_payload(&manifest_bytes, &lesson_bytes).map_err(io::Error::other)?;
-    Ok(())
+    let manifest_bytes = fs::read(&manifest_path).map_err(|error| error.to_string())?;
+    let lesson_bytes = fs::read(&lesson_path).map_err(|error| error.to_string())?;
+    verify_curriculum_payload(&manifest_bytes, &lesson_bytes)
 }
 
 fn main() {
