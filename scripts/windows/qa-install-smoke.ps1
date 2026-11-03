@@ -39,7 +39,7 @@ if (!(Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
     throw "The installer completed but fluently-desktop.exe was not found. Installed files: $($installedFiles -join '; ')"
 }
 
-$resourceLesson = Join-Path $installFullPath "resources\curriculum\lessons\pre-a1-integrity-fixture.json"
+$resourceLesson = Join-Path $installFullPath "curriculum\lessons\pre-a1-integrity-fixture.json"
 if (!(Test-Path -LiteralPath $resourceLesson -PathType Leaf)) {
     $installedFiles = Get-ChildItem -LiteralPath $installFullPath -File -Recurse | Select-Object -ExpandProperty FullName
     throw "The embedded curriculum fixture was not installed at the expected resource path. Installed files: $($installedFiles -join '; ')"
