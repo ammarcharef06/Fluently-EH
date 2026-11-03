@@ -33,7 +33,7 @@
 | المجال | الحالة المثبتة | المطلوب قبل الاعتماد |
 |---|---|---|
 | Web/PWA | واجهة أولية وCI build | تنزيل المنهج الكامل، واختبارات browser/Offline/eviction/restore/update |
-| Windows | Tauri shell وEXE QA؛ نجح NSIS install/launch smoke على windows-2025 في CI run [41675891966](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41675891966) | H2b-4: قراءة حزمة المنهج المضمّنة والتحقق من SHA-256 ورفض tamper؛ H2b-5: SQLite وتقدم المتعلم؛ توثيق Authenticode أو عدم توفره وبصمات QA |
+| Windows | Tauri shell وEXE QA؛ H2b-3 install/launch اجتاز؛ H2b-4 اجتاز CI run [41703166428](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41703166428) والمراجعة الفنية المستقلة، ودُمج PR #29 في `c09167f14451da0e4630766ad72b657c0609720d` | H2b-5: SQLite وتقدم المتعلم مع اختبار Windows المثبّت وإعادة التشغيل Offline وschema migration؛ توثيق Authenticode أو عدم توفره وبصمات QA. CI ما بعد الدمج run [41708362480](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41708362480): `validate` نجح، وWindows قيد التنفيذ عند آخر تحقق |
 | محرك المنهج والحزم | نواة `curriculum-engine` وقارئ/منشئ ZIP32 مدمجان في الفروع التي اجتازت CI الخاصة بها | توصيل تنزيل ZIP وتفعيله بواجهة المتعلم، تحقق دلالي للمحتوى، توافق إصدار التطبيق، واختبارات متصفح وOffline؛ لم توجد حزمة معتمدة للاختبار الفعلي |
 | محرك التقييم | نواة `packages/assessment-engine` مدمجة؛ أُضيف تكامل مباشر لـ`gradeChoice` في `apps/web` مع اختبار تدفق لسؤال الضمائر الحالي | إضافة مخططات أسئلة معتمدة للأنواع الأخرى وحقول hints/الأمثلة عند مراجعتها، ثم تعريف معايرة بشرية صريحة قبل mastery/placement؛ اختبارات متصفح فعلية؛ لا تقييم صوتي |
 | Android | Capacitor shell؛ H2a جزئي | يأتي بعد استقرار Web/Windows؛ SQLite والحزمة المضمّنة وlifecycle ثم H2a/H4 |
