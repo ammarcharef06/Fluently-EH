@@ -39,4 +39,4 @@ The QA installer and executable are unsigned internal artifacts. They are not st
 - The Windows install smoke probe verifies the clean embedded fixture starts, changes one installed lesson byte and requires startup to fail, restores the original bytes, and requires startup to succeed again. This is a fixture-level integrity test, not proof of a complete learner lesson flow.
 - The manifest digest is an integrity pin inside the executable, not a digital signature or protection against a replaced/patched executable. Authenticode remains a separate distribution gate.
 - Native SQLite, learner progress persistence, full offline lesson execution, and update behavior remain unimplemented.
-- No privileged commands, filesystem access, shell access, or broad Tauri permissions are enabled.
+- No privileged commands, arbitrary filesystem access from the frontend, shell access, or broad Tauri permissions are enabled. The Rust startup verifier reads only the two bundled curriculum fixture resources.
