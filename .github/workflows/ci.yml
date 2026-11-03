@@ -184,7 +184,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload generated Cargo lockfile
+      - name: Archive committed Cargo lockfile for build evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: fluently-windows-cargo-lock
