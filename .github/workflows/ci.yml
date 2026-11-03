@@ -44,7 +44,7 @@ jobs:
         run: pnpm run build
 
   windows-h2b-environment:
-    name: H2b Windows toolchain and WebView2
+    name: H2b Windows build, install and runtime smoke
     runs-on: windows-2025
     timeout-minutes: 30
     steps:
@@ -147,6 +147,35 @@ jobs:
 
       - name: Install pinned Tauri CLI
         run: npm install --global @tauri-apps/cli@2.12.4
+
+      - name: Install pinned NSIS toolchain
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          choco install nsis --version=3.13.0 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) {
+            throw "NSIS installation failed with exit code $LASTEXITCODE."
+          }
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (!$makensis) {
+            $candidates = @(
+              (Join-Path "${env:ProgramFiles(x86)}" "NSIS\makensis.exe"),
+              (Join-Path $env:ProgramFiles "NSIS\makensis.exe")
+            )
+            $makensisPath = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+            if (!$makensisPath) {
+              throw "makensis.exe was not found after installing NSIS."
+            }
+            Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $makensisPath)
+            $makensisPath = $makensisPath
+          } else {
+            $makensisPath = $makensis.Source
+          }
+          & $makensisPath /VERSION
+          if ($LASTEXITCODE -ne 0) {
+            throw "NSIS version probe failed."
+          }
+
 
       - name: Generate temporary Windows build icon
         shell: pwsh
