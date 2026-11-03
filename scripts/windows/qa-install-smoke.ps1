@@ -75,8 +75,8 @@ try {
     $appProcess = $null
 
     # Change exactly one installed lesson byte. Startup must fail closed.
-    $tamperedBytes = [byte[]]$originalLessonBytes.Clone()
-    $tamperedBytes[20] = $tamperedBytes[20] -bxor 1
+    $tamperedBytes = [byte[]]($originalLessonBytes.Clone())
+    $tamperedBytes[20] = [byte]($tamperedBytes[20] -bxor 1)
     [System.IO.File]::WriteAllBytes($resourceLesson, $tamperedBytes)
 
     try {
