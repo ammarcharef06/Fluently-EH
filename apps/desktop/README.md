@@ -34,7 +34,7 @@ The QA installer and executable are unsigned internal artifacts. They are not st
 ## Explicit limitations of this stage
 
 - No native SQLite adapter is connected. `packages/storage-native` remains incomplete.
-- A small, explicitly non-published H2b-4 fixture is bundled as a Windows resource. Startup verifies the manifest against a SHA-256 digest compiled into the executable, then verifies the fixture size, SHA-256, and draft metadata before the window is created. This fixture is not the published curriculum.
+- A small, explicitly non-published H2b-4 fixture is bundled as a Windows resource. Startup verifies the manifest against a SHA-256 digest compiled into the executable, then verifies the fixture size, SHA-256, and draft metadata during startup; the application exits if verification fails. This fixture is not the published curriculum.
 - The NSIS installer is used for internal QA only; no stable distribution, update mechanism, Authenticode signing, or SmartScreen trust claim is provided.
 - The Windows install smoke probe verifies the clean embedded fixture starts, changes one installed lesson byte and requires startup to fail, restores the original bytes, and requires startup to succeed again. This is a fixture-level integrity test, not proof of a complete learner lesson flow.
 - The manifest digest is an integrity pin inside the executable, not a digital signature or protection against a replaced/patched executable. Authenticode remains a separate distribution gate.
