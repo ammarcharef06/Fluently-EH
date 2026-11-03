@@ -8,7 +8,7 @@ on:
       - main
       - implementation/full-build
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: fluently-ci-${{ github.ref }}
   cancel-in-progress: false
@@ -167,6 +167,28 @@ jobs:
             $icon.Dispose()
             $bitmap.Dispose()
           }
+
+      - name: Regenerate and commit the Windows Cargo lockfile
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: apps/desktop/src-tauri
+        shell: pwsh
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          cargo generate-lockfile
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "build(windows): refresh generated Cargo lockfile"
+            git push origin "HEAD:$env:PR_HEAD_REF"
+          }
+
+      - name: Verify Cargo dependencies against committed lockfile
+        working-directory: apps/desktop/src-tauri
+        run: cargo check --locked --target x86_64-pc-windows-msvc
 
       - name: Build Windows QA executable
         working-directory: apps/desktop/src-tauri
