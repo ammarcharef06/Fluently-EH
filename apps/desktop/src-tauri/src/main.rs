@@ -17,6 +17,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
+fn parse_json(bytes: &[u8], error_message: &str) -> Result<serde_json::Value, String> {
+    serde_json::from_slice(bytes).map_err(|_| error_message.to_string())
+}
+
 /// Verifies the manifest against a digest compiled into the executable, then
 /// verifies every declared payload byte during normal application startup.
 fn verify_curriculum_payload(manifest_bytes: &[u8], lesson_bytes: &[u8]) -> Result<(), String> {
@@ -30,8 +34,10 @@ fn verify_curriculum_payload(manifest_bytes: &[u8], lesson_bytes: &[u8]) -> Resu
         return Err("Embedded curriculum manifest integrity check failed.".into());
     }
 
-    let manifest: serde_json::Value = serde_json::from_slice(manifest_bytes)
-        .map_err(|_| "Embedded curriculum manifest is not valid JSON.")?;
+    let manifest = parse_json(
+        manifest_bytes,
+        "Embedded curriculum manifest is not valid JSON.",
+    )?;
     if manifest.get("packageId").and_then(|value| value.as_str()) != Some(EXPECTED_PACKAGE_ID) {
         return Err("Embedded curriculum package identifier is not supported.".into());
     }
@@ -72,8 +78,10 @@ fn verify_curriculum_payload(manifest_bytes: &[u8], lesson_bytes: &[u8]) -> Resu
         return Err("Embedded curriculum lesson SHA-256 check failed.".into());
     }
 
-    let lesson: serde_json::Value = serde_json::from_slice(lesson_bytes)
-        .map_err(|_| "Embedded curriculum lesson is not valid JSON.")?;
+    let lesson = parse_json(
+        lesson_bytes,
+        "Embedded curriculum lesson is not valid JSON.",
+    )?;
     if lesson.get("id").and_then(|value| value.as_str()) != Some("h2b4-integrity-fixture")
         || lesson.get("type").and_then(|value| value.as_str()) != Some("lesson")
         || lesson.get("status").and_then(|value| value.as_str()) != Some("draft")
@@ -162,8 +170,15 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_json_and_oversized_input() {
-        assert!(verify_curriculum_payload(b"{", LESSON).is_err());
-        assert!(verify_curriculum_payload(MANIFEST, &vec![0; MAX_LESSON_BYTES + 1]).is_err());
+    fn rejects_invalid_json_in_both_payload_types_and_oversized_input() {
+        assert!(parse_json(b"{", "manifest invalid JSON")
+            .unwrap_err()
+            .contains("manifest invalid JSON"));
+        assert!(parse_json(b"{", "lesson invalid JSON")
+            .unwrap_err()
+            .contains("lesson invalid JSON"));
+        assert!(verify_curriculum_payload(MANIFEST, &vec![0; MAX_LESSON_BYTES + 1])
+            .unwrap_err()
+            .contains("invalid size"));
     }
 }
