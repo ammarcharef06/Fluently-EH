@@ -18,7 +18,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Verifies the manifest against a digest compiled into the executable, then
-/// verifies every declared payload byte before the application can start.
+/// verifies every declared payload byte during normal application startup.
 fn verify_curriculum_payload(manifest_bytes: &[u8], lesson_bytes: &[u8]) -> Result<(), String> {
     if manifest_bytes.is_empty() || manifest_bytes.len() > MAX_MANIFEST_BYTES {
         return Err("Embedded curriculum manifest has an invalid size.".into());
