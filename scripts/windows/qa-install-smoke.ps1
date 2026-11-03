@@ -81,10 +81,18 @@ try {
 
     try {
         $tamperedProcess = Start-Process -FilePath $appExecutable -WorkingDirectory $installFullPath -PassThru
-        Start-Sleep -Seconds 8
+        $tamperDeadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
+        do {
+            Start-Sleep -Seconds 1
+            $tamperedProcess.Refresh()
+            if ($tamperedProcess.HasExited) {
+                break
+            }
+        } while ([DateTime]::UtcNow -lt $tamperDeadline)
+
         $tamperedProcess.Refresh()
         if (!$tamperedProcess.HasExited) {
-            throw "Fluently remained running after the installed curriculum payload was modified."
+            throw "Fluently remained running after the tamper startup timeout of $StartupTimeoutSeconds seconds."
         }
         $tamperExitCode = $tamperedProcess.ExitCode
         if ($tamperExitCode -eq 0) {
