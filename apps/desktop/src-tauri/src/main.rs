@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use sha2::{Digest, Sha256};
-use std::{fs, io};
+use std::{fs, io, io::Read, path::Path};
 use tauri::{path::BaseDirectory, Manager};
 
 const TRUSTED_MANIFEST_SHA256: &str =
@@ -86,6 +86,25 @@ fn verify_curriculum_payload(manifest_bytes: &[u8], lesson_bytes: &[u8]) -> Resu
     Ok(())
 }
 
+fn read_bounded_resource(path: &Path, maximum_bytes: usize) -> Result<Vec<u8>, String> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    if !metadata.file_type().is_file() || metadata.len() == 0
+        || metadata.len() > maximum_bytes as u64
+    {
+        return Err("Embedded curriculum resource is not a regular file within its size limit.".into());
+    }
+
+    let file = fs::File::open(path).map_err(|error| error.to_string())?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(maximum_bytes as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() > maximum_bytes || bytes.len() as u64 != metadata.len() {
+        return Err("Embedded curriculum resource changed size while being read.".into());
+    }
+    Ok(bytes)
+}
+
 fn verify_embedded_curriculum(app: &tauri::AppHandle) -> Result<(), String> {
     let resource_root = app.path()
         .resolve("curriculum", BaseDirectory::Resource)
@@ -93,8 +112,8 @@ fn verify_embedded_curriculum(app: &tauri::AppHandle) -> Result<(), String> {
     let manifest_path = resource_root.join("manifest.json");
     let lesson_path = resource_root.join(EXPECTED_LESSON_PATH);
 
-    let manifest_bytes = fs::read(&manifest_path).map_err(|error| error.to_string())?;
-    let lesson_bytes = fs::read(&lesson_path).map_err(|error| error.to_string())?;
+    let manifest_bytes = read_bounded_resource(&manifest_path, MAX_MANIFEST_BYTES)?;
+    let lesson_bytes = read_bounded_resource(&lesson_path, MAX_LESSON_BYTES)?;
     verify_curriculum_payload(&manifest_bytes, &lesson_bytes)
 }
 
