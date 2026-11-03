@@ -43,6 +43,15 @@ fn verify_curriculum_payload(manifest_bytes: &[u8], lesson_bytes: &[u8]) -> Resu
     if manifest.get("schemaVersion").and_then(|value| value.as_u64()) != Some(1) {
         return Err("Embedded curriculum schema version is not supported.".into());
     }
+    let max_app_version_is_null = manifest
+        .get("maxAppVersion")
+        .map(serde_json::Value::is_null)
+        .unwrap_or(false);
+    if manifest.get("minAppVersion").and_then(|value| value.as_str()) != Some("0.1.0")
+        || !max_app_version_is_null
+    {
+        return Err("Embedded curriculum application compatibility range is not supported.".into());
+    }
 
     let files = manifest.get("files").and_then(|value| value.as_array())
         .ok_or("Embedded curriculum manifest has no file list.")?;
