@@ -1,0 +1,33 @@
+{
+  "id": "h2b4-integrity-fixture",
+  "type": "lesson",
+  "title": "H2b-4 integrity test fixture",
+  "description": "A non-published fixture used only to verify the embedded Windows curriculum payload.",
+  "stage": "pre-a1",
+  "skills": ["vocabulary"],
+  "objectives": [
+    { "id": "h2b4-fixture-objective", "description": "Verify that the desktop application accepts only the exact embedded fixture bytes." }
+  ],
+  "prerequisites": [],
+  "estimatedMinutes": 1,
+  "steps": [
+    {
+      "id": "h2b4-fixture-explanation",
+      "type": "explanation",
+      "heading": "Test fixture",
+      "body": "This content is a technical integrity fixture. It is not an approved or published learner lesson."
+    }
+  ],
+  "status": "draft",
+  "contentVersion": "0.0.0-h2b4-test",
+  "source": {
+    "kind": "original",
+    "note": "Original technical test fixture authored for the Fluently H2b-4 acceptance path.",
+    "license": "CC0-1.0"
+  },
+  "review": {
+    "reviewerId": null,
+    "reviewedAt": null,
+    "approvalNote": null
+  }
+}
