@@ -22,12 +22,17 @@
       }
     ],
     "security": {
-      "capabilities": ["default"]
-    }
+      "capabilities": [
+        "default"
+      ]
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "resources": {
       "resources/curriculum/manifest.json": "curriculum/manifest.json",
       "resources/curriculum/lessons/pre-a1-integrity-fixture.json": "curriculum/lessons/pre-a1-integrity-fixture.json"
