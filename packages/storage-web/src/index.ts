@@ -144,10 +144,24 @@ export async function readSetting(key: string): Promise<string | number | boolea
   return db.get('settings', key);
 }
 export async function clearLocalLearningData(): Promise<void> {
-  // Remove the IndexedDB source before deleting the native identity; otherwise
-  // a later first-use migration could re-import data the learner just cleared.
+  const core = getNativeCore();
   const db = await openFluentlyDB();
   const storeNames = ['progress', 'outbox', 'reviews', 'settings'] as const;
+
+  if (!core) {
+    const tx = db.transaction(storeNames, 'readwrite');
+    await Promise.all([
+      tx.objectStore('progress').clear(),
+      tx.objectStore('outbox').clear(),
+      tx.objectStore('reviews').clear(),
+      tx.objectStore('settings').clear()
+    ]);
+    await tx.done;
+    return;
+  }
+
+  // Remove the IndexedDB source before deleting the native identity; otherwise
+  // a later first-use migration could re-import data the learner just cleared.
   const tx = db.transaction(storeNames, 'readwrite');
   const [progressSnapshot, outboxSnapshot, reviewSnapshot, settingSnapshot, settingKeys] =
     await Promise.all([
@@ -165,45 +179,42 @@ export async function clearLocalLearningData(): Promise<void> {
   ]);
   await tx.done;
 
-  const core = getNativeCore();
-  if (core) {
-    // Let an already-started migration finish before the wipe so it cannot
-    // restore legacy rows after the native delete. A failed import must not
-    // prevent the explicit local-data deletion command from running.
-    if (nativeProgressMigrationCore === core && nativeProgressMigrationPromise) {
-      try {
-        await nativeProgressMigrationPromise;
-      } catch {
-        nativeProgressMigrationPromise = undefined;
-      }
-    }
+  // Let an already-started migration finish before the wipe so it cannot
+  // restore legacy rows after the native delete. A failed import must not
+  // prevent the explicit local-data deletion command from running.
+  if (nativeProgressMigrationCore === core && nativeProgressMigrationPromise) {
     try {
-      await core.invoke<void>('clear_local_learning_data');
-    } catch (error) {
-      // SQLite deletion is atomic. Restore the IndexedDB snapshot if the native
-      // transaction fails so a partial cross-store wipe does not discard data.
-      const rollback = db.transaction(storeNames, 'readwrite');
-      const restoreRequests: Promise<unknown>[] = [
-        ...progressSnapshot.map((record) => rollback.objectStore('progress').put(record)),
-        ...outboxSnapshot.map((record) => rollback.objectStore('outbox').put(record)),
-        ...reviewSnapshot.map((record) => rollback.objectStore('reviews').put(record)),
-        ...settingSnapshot.map((value, index) =>
-          rollback.objectStore('settings').put(value, settingKeys[index])
-        )
-      ];
-      try {
-        await Promise.all(restoreRequests);
-        await rollback.done;
-      } catch (rollbackError) {
-        throw new Error(
-          `Native local-data deletion failed (${String(error)}); IndexedDB restoration also failed (${String(rollbackError)}).`
-        );
-      }
-      throw error;
+      await nativeProgressMigrationPromise;
+    } catch {
+      nativeProgressMigrationPromise = undefined;
     }
-    nativeProgressMigrationCore = undefined;
-    nativeProgressMigrationPromise = undefined;
   }
+  try {
+    await core.invoke<void>('clear_local_learning_data');
+  } catch (error) {
+    // SQLite deletion is atomic. Restore the IndexedDB snapshot if the native
+    // transaction fails so a partial cross-store wipe does not discard data.
+    const rollback = db.transaction(storeNames, 'readwrite');
+    const restoreRequests: Promise<unknown>[] = [
+      ...progressSnapshot.map((record) => rollback.objectStore('progress').put(record)),
+      ...outboxSnapshot.map((record) => rollback.objectStore('outbox').put(record)),
+      ...reviewSnapshot.map((record) => rollback.objectStore('reviews').put(record)),
+      ...settingSnapshot.map((value, index) =>
+        rollback.objectStore('settings').put(value, settingKeys[index])
+      )
+    ];
+    try {
+      await Promise.all(restoreRequests);
+      await rollback.done;
+    } catch (rollbackError) {
+      throw new Error(
+        `Native local-data deletion failed (${String(error)}); IndexedDB restoration also failed (${String(rollbackError)}).`
+      );
+    }
+    throw error;
+  }
+  nativeProgressMigrationCore = undefined;
+  nativeProgressMigrationPromise = undefined;
 }
 export function requestPersistentStorage(): Promise<boolean> {
   if (!('storage' in navigator) || !navigator.storage?.persist) return Promise.resolve(false);
