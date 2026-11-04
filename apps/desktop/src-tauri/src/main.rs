@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use sha2::{Digest, Sha256};
-use std::{fs, io::Read, path::Path};
+use rusqlite::{params, Connection, OptionalExtension};
+use serde::{Deserialize, Serialize};
+use std::{fs, io::Read, path::Path, sync::Mutex};
 use tauri::{path::BaseDirectory, Manager};
 
 const TRUSTED_MANIFEST_SHA256: &str =
@@ -125,17 +127,155 @@ fn verify_embedded_curriculum(app: &tauri::AppHandle) -> Result<(), String> {
     verify_curriculum_payload(&manifest_bytes, &lesson_bytes)
 }
 
+#[derive(Debug)]
+struct NativeDatabase(Mutex<Connection>);
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct LessonProgress {
+    learner_id: String,
+    lesson_id: String,
+    completed_step_ids: Vec<String>,
+    updated_at: String,
+    content_version: String,
+}
+
+fn initialize_database(connection: &Connection) -> rusqlite::Result<()> {
+    let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    if version > 1 {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
+    if version == 0 {
+        connection.execute_batch(
+            "BEGIN IMMEDIATE;
+             CREATE TABLE lesson_progress (
+                 learner_id TEXT NOT NULL CHECK(length(trim(learner_id)) > 0),
+                 lesson_id TEXT NOT NULL CHECK(length(trim(lesson_id)) > 0),
+                 completed_step_ids_json TEXT NOT NULL CHECK(json_valid(completed_step_ids_json)),
+                 updated_at TEXT NOT NULL,
+                 content_version TEXT NOT NULL,
+                 PRIMARY KEY (learner_id, lesson_id)
+             );
+             PRAGMA user_version = 1;
+             COMMIT;",
+        )?;
+    }
+    Ok(())
+}
+
+fn open_database(path: &Path) -> rusqlite::Result<Connection> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|_| rusqlite::Error::InvalidPath(path.to_path_buf()))?;
+    }
+    let connection = Connection::open(path)?;
+    connection.busy_timeout(std::time::Duration::from_secs(5))?;
+    connection.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")?;
+    initialize_database(&connection)?;
+    Ok(connection)
+}
+
+fn save_progress(connection: &Connection, progress: &LessonProgress) -> rusqlite::Result<()> {
+    if progress.learner_id.trim().is_empty() || progress.lesson_id.trim().is_empty() {
+        return Err(rusqlite::Error::InvalidParameterName(
+            "learner_id and lesson_id must not be empty".into(),
+        ));
+    }
+    let completed = serde_json::to_string(&progress.completed_step_ids)
+        .map_err(|_| rusqlite::Error::InvalidQuery)?;
+    connection.execute(
+        "INSERT INTO lesson_progress
+            (learner_id, lesson_id, completed_step_ids_json, updated_at, content_version)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(learner_id, lesson_id) DO UPDATE SET
+            completed_step_ids_json = excluded.completed_step_ids_json,
+            updated_at = excluded.updated_at,
+            content_version = excluded.content_version",
+        params![
+            progress.learner_id,
+            progress.lesson_id,
+            completed,
+            progress.updated_at,
+            progress.content_version
+        ],
+    )?;
+    Ok(())
+}
+
+fn read_progress(
+    connection: &Connection,
+    learner_id: &str,
+    lesson_id: &str,
+) -> rusqlite::Result<Option<LessonProgress>> {
+    connection
+        .query_row(
+            "SELECT learner_id, lesson_id, completed_step_ids_json, updated_at, content_version
+             FROM lesson_progress WHERE learner_id = ?1 AND lesson_id = ?2",
+            params![learner_id, lesson_id],
+            |row| {
+                let completed_json: String = row.get(2)?;
+                let completed_step_ids = serde_json::from_str(&completed_json)
+                    .map_err(|_| rusqlite::Error::InvalidQuery)?;
+                Ok(LessonProgress {
+                    learner_id: row.get(0)?,
+                    lesson_id: row.get(1)?,
+                    completed_step_ids,
+                    updated_at: row.get(3)?,
+                    content_version: row.get(4)?,
+                })
+            },
+        )
+        .optional()
+}
+
+#[tauri::command]
+fn save_lesson_progress(
+    database: tauri::State<'_, NativeDatabase>,
+    progress: LessonProgress,
+) -> Result<(), String> {
+    let connection = database.0.lock().map_err(|_| "Local database lock is unavailable.".to_string())?;
+    save_progress(&connection, &progress).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn read_lesson_progress(
+    database: tauri::State<'_, NativeDatabase>,
+    learner_id: String,
+    lesson_id: String,
+) -> Result<Option<LessonProgress>, String> {
+    let connection = database.0.lock().map_err(|_| "Local database lock is unavailable.".to_string())?;
+    read_progress(&connection, &learner_id, &lesson_id).map_err(|error| error.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
             if let Err(error) = verify_embedded_curriculum(app.handle()) {
                 eprintln!("Fluently startup blocked: {error}");
                 // The application must never continue after an integrity failure.
-                // This runs before the first window is created and before learner data is opened.
                 std::process::exit(1);
             }
+
+            let database_path = match app.path().app_data_dir() {
+                Ok(directory) => directory.join("fluently.sqlite3"),
+                Err(error) => {
+                    eprintln!("Fluently local database path unavailable: {error}");
+                    std::process::exit(1);
+                }
+            };
+            let connection = match open_database(&database_path) {
+                Ok(connection) => connection,
+                Err(error) => {
+                    eprintln!("Fluently local database initialization failed: {error}");
+                    std::process::exit(1);
+                }
+            };
+            app.manage(NativeDatabase(Mutex::new(connection)));
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            save_lesson_progress,
+            read_lesson_progress
+        ])
         .run(tauri::generate_context!())
         .expect("failed to run Fluently desktop application");
 }
@@ -180,5 +320,104 @@ mod tests {
         assert!(verify_curriculum_payload(MANIFEST, &vec![0; MAX_LESSON_BYTES + 1])
             .unwrap_err()
             .contains("invalid size"));
+    }
+}
+
+
+#[cfg(test)]
+mod sqlite_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_DATABASE_ID: AtomicU64 = AtomicU64::new(0);
+
+    fn temporary_database_path() -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "fluently-h2b5-{}-{}.sqlite3",
+            std::process::id(),
+            NEXT_DATABASE_ID.fetch_add(1, Ordering::Relaxed)
+        ))
+    }
+
+    fn sample_progress(learner_id: &str, completed: &[&str]) -> LessonProgress {
+        LessonProgress {
+            learner_id: learner_id.into(),
+            lesson_id: "lesson-001".into(),
+            completed_step_ids: completed.iter().map(|value| (*value).into()).collect(),
+            updated_at: "2026-11-04T06:00:00Z".into(),
+            content_version: "content-1".into(),
+        }
+    }
+
+    #[test]
+    fn creates_version_one_schema_and_rejects_future_schema_versions() {
+        let connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
+        assert_eq!(version, 1);
+        connection.pragma_update(None, "user_version", 2).unwrap();
+        assert!(initialize_database(&connection).is_err());
+    }
+
+    #[test]
+    fn progress_is_isolated_by_learner_and_lesson() {
+        let connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        save_progress(&connection, &sample_progress("learner-a", &["step-1"])).unwrap();
+        save_progress(&connection, &sample_progress("learner-b", &["step-2"])).unwrap();
+
+        assert_eq!(
+            read_progress(&connection, "learner-a", "lesson-001").unwrap().unwrap().completed_step_ids,
+            vec!["step-1"]
+        );
+        assert_eq!(
+            read_progress(&connection, "learner-b", "lesson-001").unwrap().unwrap().completed_step_ids,
+            vec!["step-2"]
+        );
+        assert!(read_progress(&connection, "learner-a", "missing-lesson").unwrap().is_none());
+    }
+
+    #[test]
+    fn saving_the_same_learner_lesson_updates_one_record() {
+        let connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        save_progress(&connection, &sample_progress("learner-a", &["step-1"])).unwrap();
+        save_progress(&connection, &sample_progress("learner-a", &["step-1", "step-2"])).unwrap();
+
+        let count: i64 = connection.query_row("SELECT COUNT(*) FROM lesson_progress", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(
+            read_progress(&connection, "learner-a", "lesson-001").unwrap().unwrap().completed_step_ids,
+            vec!["step-1", "step-2"]
+        );
+    }
+
+    #[test]
+    fn rejects_empty_learner_or_lesson_identifiers() {
+        let connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        assert!(save_progress(&connection, &sample_progress(" ", &[])).is_err());
+        let mut invalid = sample_progress("learner-a", &[]);
+        invalid.lesson_id = "".into();
+        assert!(save_progress(&connection, &invalid).is_err());
+    }
+
+    #[test]
+    fn progress_survives_closing_and_reopening_the_database() {
+        let path = temporary_database_path();
+        {
+            let connection = open_database(&path).unwrap();
+            save_progress(&connection, &sample_progress("learner-a", &["step-1", "step-3"])).unwrap();
+        }
+        {
+            let connection = open_database(&path).unwrap();
+            assert_eq!(
+                read_progress(&connection, "learner-a", "lesson-001").unwrap().unwrap().completed_step_ids,
+                vec!["step-1", "step-3"]
+            );
+        }
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(path.with_extension("sqlite3-wal"));
+        let _ = fs::remove_file(path.with_extension("sqlite3-shm"));
     }
 }
