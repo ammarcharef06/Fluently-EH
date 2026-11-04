@@ -724,6 +724,7 @@ mod sqlite_tests {
     fn failed_legacy_import_does_not_mark_the_migration_complete() {
         let mut connection = Connection::open_in_memory().unwrap();
         initialize_database(&connection).unwrap();
+        get_or_create_local_learner_id(&connection).unwrap();
         let invalid = vec![sample_progress(&[])];
         let mut invalid_record = invalid[0].clone();
         invalid_record.lesson_id = " ".into();
