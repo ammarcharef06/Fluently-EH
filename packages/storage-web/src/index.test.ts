@@ -1,20 +1,132 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { enqueueOperation, pendingOperations, acknowledgeOperations } from './index';
-describe('offline outbox', () => {
+import {
+  acknowledgeOperations,
+  clearLocalLearningData,
+  enqueueOperation,
+  listLessonProgress,
+  listReviewStates,
+  openFluentlyDB,
+  pendingOperations,
+  readLessonProgress,
+  readSetting,
+  saveLessonProgress,
+  saveReviewState,
+  saveSetting
+} from './index';
+
+describe('web IndexedDB learning storage', () => {
   beforeEach(async () => {
-    const databases = await indexedDB.databases();
-    await Promise.all(databases.filter((db) => db.name === 'fluently-local').map((db) => new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(db.name!);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    })));
+    const db = await openFluentlyDB();
+    await Promise.all([
+      db.clear('progress'),
+      db.clear('outbox'),
+      db.clear('reviews'),
+      db.clear('settings')
+    ]);
   });
+
+  it('persists lesson progress and reads it back by lesson id', async () => {
+    const progress = {
+      lessonId: 'lesson-1',
+      completedStepIds: ['step-1', 'step-2'],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      contentVersion: 'draft-1'
+    };
+
+    await saveLessonProgress(progress);
+
+    await expect(readLessonProgress('lesson-1')).resolves.toEqual(progress);
+    await expect(listLessonProgress()).resolves.toEqual([progress]);
+  });
+
+  it('updates an existing lesson progress record instead of creating a duplicate', async () => {
+    await saveLessonProgress({
+      lessonId: 'lesson-1',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      contentVersion: 'draft-1'
+    });
+    const updated = {
+      lessonId: 'lesson-1',
+      completedStepIds: ['step-1', 'step-2'],
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      contentVersion: 'draft-2'
+    };
+
+    await saveLessonProgress(updated);
+
+    await expect(listLessonProgress()).resolves.toEqual([updated]);
+  });
+
   it('retains operations until explicitly acknowledged', async () => {
-    const operation = { operationId: 'op-1', entityId: 'lesson-1', entityType: 'lesson_attempt' as const, schemaVersion: 1 as const, occurredAtLocal: '2026-01-01T00:00:00Z', payload: { correct: true }, status: 'pending' as const };
+    const operation = {
+      operationId: 'op-1',
+      entityId: 'lesson-1',
+      entityType: 'lesson_attempt' as const,
+      schemaVersion: 1 as const,
+      occurredAtLocal: '2026-01-01T00:00:00Z',
+      payload: { correct: true },
+      status: 'pending' as const
+    };
+
     await enqueueOperation(operation);
-    expect((await pendingOperations()).map((item) => item.operationId)).toEqual(['op-1']);
+
+    await expect(pendingOperations()).resolves.toEqual([operation]);
+
     await acknowledgeOperations(['op-1']);
-    expect(await pendingOperations()).toEqual([]);
+
+    await expect(pendingOperations()).resolves.toEqual([]);
+  });
+
+  it('persists review state and learner settings', async () => {
+    const review = {
+      itemId: 'question-1',
+      repetitions: 2,
+      intervalDays: 3,
+      ease: 2.5,
+      dueAt: '2026-01-04T00:00:00.000Z',
+      version: 'fluently-srs-1' as const
+    };
+
+    await saveReviewState(review);
+    await saveSetting('interfaceLocale', 'en-GB');
+
+    await expect(listReviewStates()).resolves.toEqual([review]);
+    await expect(readSetting('interfaceLocale')).resolves.toBe('en-GB');
+  });
+
+  it('clears learning records and settings without touching other IndexedDB stores', async () => {
+    await saveLessonProgress({
+      lessonId: 'lesson-1',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      contentVersion: 'draft-1'
+    });
+    await enqueueOperation({
+      operationId: 'op-1',
+      entityId: 'lesson-1',
+      entityType: 'lesson_attempt',
+      schemaVersion: 1,
+      occurredAtLocal: '2026-01-01T00:00:00Z',
+      payload: { correct: true },
+      status: 'pending'
+    });
+    await saveReviewState({
+      itemId: 'question-1',
+      repetitions: 1,
+      intervalDays: 1,
+      ease: 2.5,
+      dueAt: '2026-01-02T00:00:00.000Z',
+      version: 'fluently-srs-1'
+    });
+    await saveSetting('interfaceLocale', 'ar');
+
+    await clearLocalLearningData();
+
+    await expect(listLessonProgress()).resolves.toEqual([]);
+    await expect(pendingOperations()).resolves.toEqual([]);
+    await expect(listReviewStates()).resolves.toEqual([]);
+    await expect(readSetting('interfaceLocale')).resolves.toBeUndefined();
   });
 });
