@@ -38,6 +38,7 @@ The QA installer and executable are unsigned internal artifacts. They are not st
 - The WebView progress API in `packages/storage-web` calls the narrow Tauri commands when the native bridge is present. On first native use, prior IndexedDB lesson progress is imported once into SQLite in a single transaction and associated with the Rust-owned local identity; failed imports remain retryable. Ordinary web/PWA sessions continue to use IndexedDB.
 - SQLite schema v1 is migrated to v2. Existing v1 progress rows are retained; they are not automatically reassigned to the new local identity. The local-data deletion command clears all SQLite lesson progress, including preserved legacy rows, and deletes the local identity row; a new UUID is generated on the next local storage use. Any future account-linking flow must define an explicit, reviewed reconciliation policy.
 - Rust tests cover UUID v4 generation and stability, migration preservation, identity-input rejection, learner isolation, upsert behavior, and progress restoration after closing and reopening the file-backed SQLite database.
+- The owner’s E-15 clarification keeps this implementation intact and stops only future additions of complex security layers. Work remains focused on the installed lesson journey, SQLite persistence, migration/update reliability, and the Windows/Android learner experience.
 
 ## Explicit limitations of this stage
 
@@ -45,6 +46,6 @@ The QA installer and executable are unsigned internal artifacts. They are not st
 - CI's Windows install/runtime smoke verifies the installer, startup, and embedded-fixture integrity. The Rust file-backed SQLite test proves database persistence across connection close/reopen, but it is not yet an installed-app UI test that completes a lesson, closes the application, restarts it offline, and reads the progress through the UI.
 - `packages/storage-native` remains a separate incomplete Capacitor/Android adapter; Windows native SQLite is implemented in `apps/desktop/src-tauri`.
 - A small, explicitly non-published H2b-4 fixture is bundled as a Windows resource. Startup verifies the manifest against a SHA-256 digest compiled into the executable, then verifies the fixture size, SHA-256, and draft metadata during startup; the application exits if verification fails.
-- The manifest digest is an integrity pin inside the executable, not a digital signature or protection against a replaced/patched executable. Authenticode remains a separate distribution gate.
+- The manifest digest and SHA-256 checks are existing curriculum-integrity checks and remain unchanged. No additional anti-tampering layer or Authenticode work is planned for the current private-use scope; the existing checks are not being removed.
 - The NSIS installer is used for internal QA only; no stable distribution, update mechanism, Authenticode signing, or SmartScreen trust claim is provided.
 - No privileged commands, arbitrary filesystem access from the frontend, shell access, or broad Tauri permissions are enabled. The Rust startup verifier reads only the two bundled curriculum fixture resources.
