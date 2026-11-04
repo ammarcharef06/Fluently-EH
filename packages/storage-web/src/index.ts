@@ -147,7 +147,16 @@ export async function clearLocalLearningData(): Promise<void> {
   // Remove the IndexedDB source before deleting the native identity; otherwise
   // a later first-use migration could re-import data the learner just cleared.
   const db = await openFluentlyDB();
-  const tx = db.transaction(['progress', 'outbox', 'reviews', 'settings'], 'readwrite');
+  const storeNames = ['progress', 'outbox', 'reviews', 'settings'] as const;
+  const tx = db.transaction(storeNames, 'readwrite');
+  const [progressSnapshot, outboxSnapshot, reviewSnapshot, settingSnapshot, settingKeys] =
+    await Promise.all([
+      tx.objectStore('progress').getAll(),
+      tx.objectStore('outbox').getAll(),
+      tx.objectStore('reviews').getAll(),
+      tx.objectStore('settings').getAll(),
+      tx.objectStore('settings').getAllKeys()
+    ]);
   await Promise.all([
     tx.objectStore('progress').clear(),
     tx.objectStore('outbox').clear(),
@@ -168,7 +177,30 @@ export async function clearLocalLearningData(): Promise<void> {
         nativeProgressMigrationPromise = undefined;
       }
     }
-    await core.invoke<void>('clear_local_learning_data');
+    try {
+      await core.invoke<void>('clear_local_learning_data');
+    } catch (error) {
+      // SQLite deletion is atomic. Restore the IndexedDB snapshot if the native
+      // transaction fails so a partial cross-store wipe does not discard data.
+      const rollback = db.transaction(storeNames, 'readwrite');
+      const restoreRequests: Promise<unknown>[] = [
+        ...progressSnapshot.map((record) => rollback.objectStore('progress').put(record)),
+        ...outboxSnapshot.map((record) => rollback.objectStore('outbox').put(record)),
+        ...reviewSnapshot.map((record) => rollback.objectStore('reviews').put(record)),
+        ...settingSnapshot.map((value, index) =>
+          rollback.objectStore('settings').put(value, settingKeys[index])
+        )
+      ];
+      try {
+        await Promise.all(restoreRequests);
+        await rollback.done;
+      } catch (rollbackError) {
+        throw new Error(
+          `Native local-data deletion failed (${String(error)}); IndexedDB restoration also failed (${String(rollbackError)}).`
+        );
+      }
+      throw error;
+    }
     nativeProgressMigrationCore = undefined;
     nativeProgressMigrationPromise = undefined;
   }
