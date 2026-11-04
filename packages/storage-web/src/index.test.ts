@@ -96,7 +96,8 @@ describe('web IndexedDB learning storage', () => {
     await expect(readSetting('interfaceLocale')).resolves.toBe('en-GB');
   });
 
-  it('clears learning records and settings without touching other IndexedDB stores', async () => {
+  it('clears progress, outbox, review state, and settings', async () => {
+    const db = await openFluentlyDB();
     await saveLessonProgress({
       lessonId: 'lesson-1',
       completedStepIds: ['step-1'],
@@ -125,7 +126,7 @@ describe('web IndexedDB learning storage', () => {
     await clearLocalLearningData();
 
     await expect(listLessonProgress()).resolves.toEqual([]);
-    await expect(pendingOperations()).resolves.toEqual([]);
+    await expect(db.getAll('outbox')).resolves.toEqual([]);
     await expect(listReviewStates()).resolves.toEqual([]);
     await expect(readSetting('interfaceLocale')).resolves.toBeUndefined();
   });
