@@ -260,8 +260,7 @@ describe('Windows native progress bridge', () => {
 
     await clearLocalLearningData();
 
-    expect(calls[0]).toEqual(['import_legacy_lesson_progress', { progress: [] }]);
-    expect(calls[1]).toEqual(['clear_local_learning_data', undefined]);
+    expect(calls).toEqual([['clear_local_learning_data', undefined]]);
     const db = await openFluentlyDB();
     await expect(db.getAll('progress')).resolves.toEqual([]);
 
@@ -271,8 +270,45 @@ describe('Windows native progress bridge', () => {
       updatedAt: '2026-11-04T07:00:00Z',
       contentVersion: 'content-2'
     });
-    expect(calls[2]).toEqual(['import_legacy_lesson_progress', { progress: [] }]);
-    expect(calls[3]?.[0]).toBe('save_lesson_progress');
+    expect(calls[1]).toEqual(['import_legacy_lesson_progress', { progress: [] }]);
+    expect(calls[2]?.[0]).toBe('save_lesson_progress');
+  });
+
+
+  it('still clears native data after a prior legacy import failure', async () => {
+    const legacy = {
+      lessonId: 'lesson-failed-import',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-11-03T06:00:00Z',
+      contentVersion: 'content-legacy'
+    };
+    await saveLessonProgress(legacy);
+
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'import_legacy_lesson_progress') {
+        throw new Error('temporary SQLite import failure');
+      }
+      return undefined;
+    });
+    Object.defineProperty(window, '__TAURI__', {
+      configurable: true,
+      value: { core: { invoke } }
+    });
+
+    await expect(saveLessonProgress({
+      lessonId: 'lesson-current',
+      completedStepIds: ['step-2'],
+      updatedAt: '2026-11-04T08:00:00Z',
+      contentVersion: 'content-1'
+    })).rejects.toThrow('temporary SQLite import failure');
+
+    await expect(clearLocalLearningData()).resolves.toBeUndefined();
+    expect(invoke).toHaveBeenNthCalledWith(1, 'import_legacy_lesson_progress', {
+      progress: [legacy]
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, 'clear_local_learning_data', undefined);
+    const db = await openFluentlyDB();
+    await expect(db.getAll('progress')).resolves.toEqual([]);
   });
 
   it('lists current native learner progress without a webview identity argument', async () => {
