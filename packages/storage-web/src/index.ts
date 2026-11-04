@@ -156,8 +156,19 @@ export async function clearLocalLearningData(): Promise<void> {
   ]);
   await tx.done;
 
-  const native = await nativeInvoke<void>('clear_local_learning_data');
-  if (native.available) {
+  const core = getNativeCore();
+  if (core) {
+    // Let an already-started migration finish before the wipe so it cannot
+    // restore legacy rows after the native delete. A failed import must not
+    // prevent the explicit local-data deletion command from running.
+    if (nativeProgressMigrationCore === core && nativeProgressMigrationPromise) {
+      try {
+        await nativeProgressMigrationPromise;
+      } catch {
+        nativeProgressMigrationPromise = undefined;
+      }
+    }
+    await core.invoke<void>('clear_local_learning_data');
     nativeProgressMigrationCore = undefined;
     nativeProgressMigrationPromise = undefined;
   }
