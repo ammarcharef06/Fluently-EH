@@ -473,10 +473,9 @@ fn require_legacy_progress_imported(connection: &Connection) -> rusqlite::Result
 fn clear_local_progress(connection: &mut Connection) -> rusqlite::Result<()> {
     let transaction = connection.transaction()?;
     let learner_id = get_or_create_local_learner_id(&transaction)?;
-    transaction.execute(
-        "DELETE FROM lesson_progress WHERE learner_id = ?1",
-        params![learner_id],
-    )?;
+    // A local-data wipe must also remove preserved legacy rows that are no
+    // longer associated with the current local identity.
+    transaction.execute("DELETE FROM lesson_progress", [])?;
     transaction.execute(
         "DELETE FROM local_identity WHERE singleton_id = 1",
         [],
@@ -721,10 +720,14 @@ mod sqlite_tests {
         initialize_database(&connection).unwrap();
         let learner_id = get_or_create_local_learner_id(&connection).unwrap();
         save_progress(&connection, &learner_id, &sample_progress(&["step-1"])).unwrap();
+        save_progress(&connection, LEARNER_B, &sample_progress(&["legacy-step"])).unwrap();
 
         clear_local_progress(&mut connection).unwrap();
 
-        assert!(list_progress(&connection, &learner_id).unwrap().is_empty());
+        let remaining_rows: i64 = connection
+            .query_row("SELECT COUNT(*) FROM lesson_progress", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(remaining_rows, 0);
         let next_identity = get_or_create_local_learner_id(&connection).unwrap();
         assert_ne!(next_identity, learner_id);
     }
