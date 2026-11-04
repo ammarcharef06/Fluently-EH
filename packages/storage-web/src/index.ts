@@ -28,8 +28,8 @@ let nativeProgressMigrationPromise: Promise<void> | undefined;
 let storageOperationQueue: Promise<void> = Promise.resolve();
 
 function withStorageOperation<T>(operation: () => Promise<T>): Promise<T> {
-  const result = nativeOperationQueue.then(operation, operation);
-  nativeOperationQueue = result.then(() => undefined, () => undefined);
+  const result = storageOperationQueue.then(operation, operation);
+  storageOperationQueue = result.then(() => undefined, () => undefined);
   return result;
 }
 
