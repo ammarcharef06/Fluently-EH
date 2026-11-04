@@ -181,7 +181,9 @@ fn initialize_database(connection: &Connection) -> rusqlite::Result<()> {
             "BEGIN IMMEDIATE;
              CREATE TABLE local_identity (
                  singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
-                 learner_id TEXT NOT NULL UNIQUE CHECK(length(learner_id) = 36)
+                 learner_id TEXT NOT NULL UNIQUE CHECK(length(learner_id) = 36),
+                 indexeddb_progress_imported INTEGER NOT NULL DEFAULT 0
+                     CHECK(indexeddb_progress_imported IN (0, 1))
              );
              PRAGMA user_version = 2;
              COMMIT;",
@@ -353,6 +355,57 @@ fn list_progress(
     rows.collect()
 }
 
+const MAX_LEGACY_PROGRESS_RECORDS: usize = 10_000;
+
+fn import_legacy_progress(
+    connection: &mut Connection,
+    progress: &[LessonProgressInput],
+) -> rusqlite::Result<bool> {
+    if progress.len() > MAX_LEGACY_PROGRESS_RECORDS {
+        return Err(rusqlite::Error::InvalidParameterName(
+            "Too many legacy lesson progress records to import at once.".into(),
+        ));
+    }
+
+    let learner_id = get_or_create_local_learner_id(connection)?;
+    let transaction = connection.transaction()?;
+    let already_imported: i64 = transaction.query_row(
+        "SELECT indexeddb_progress_imported FROM local_identity WHERE singleton_id = 1",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if already_imported == 1 {
+        transaction.commit()?;
+        return Ok(false);
+    }
+
+    for record in progress {
+        save_progress(&transaction, &learner_id, record)?;
+    }
+
+    transaction.execute(
+        "UPDATE local_identity
+         SET indexeddb_progress_imported = 1
+         WHERE singleton_id = 1",
+        [],
+    )?;
+    transaction.commit()?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn import_legacy_lesson_progress(
+    database: tauri::State<'_, NativeDatabase>,
+    progress: Vec<LessonProgressInput>,
+) -> Result<bool, String> {
+    let mut connection = database
+        .0
+        .lock()
+        .map_err(|_| "Local database lock is unavailable.".to_string())?;
+    import_legacy_progress(&mut connection, &progress).map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 fn save_lesson_progress(
     database: tauri::State<'_, NativeDatabase>,
@@ -422,6 +475,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            import_legacy_lesson_progress,
             save_lesson_progress,
             read_lesson_progress,
             list_lesson_progress
@@ -521,6 +575,57 @@ mod sqlite_tests {
 
         connection.pragma_update(None, "user_version", 3).unwrap();
         assert!(initialize_database(&connection).is_err());
+    }
+
+    #[test]
+    fn legacy_indexeddb_progress_is_imported_once_under_the_native_identity() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        let learner_id = get_or_create_local_learner_id(&connection).unwrap();
+
+        let legacy = vec![sample_progress(&["step-1", "step-2"])];
+        assert!(import_legacy_progress(&mut connection, &legacy).unwrap());
+
+        let restored = read_progress(&connection, &learner_id, "lesson-001")
+            .unwrap()
+            .unwrap();
+        assert_eq!(restored.learner_id, learner_id);
+        assert_eq!(restored.completed_step_ids, vec!["step-1", "step-2"]);
+
+        let later_data = vec![sample_progress(&["later-step"])];
+        assert!(!import_legacy_progress(&mut connection, &later_data).unwrap());
+        let still_restored = read_progress(&connection, &learner_id, "lesson-001")
+            .unwrap()
+            .unwrap();
+        assert_eq!(still_restored.completed_step_ids, vec!["step-1", "step-2"]);
+    }
+
+    #[test]
+    fn failed_legacy_import_does_not_mark_the_migration_complete() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        let invalid = vec![sample_progress(&[])];
+        let mut invalid_record = invalid[0].clone();
+        invalid_record.lesson_id = " ".into();
+
+        assert!(import_legacy_progress(&mut connection, &[invalid_record]).is_err());
+
+        let imported: i64 = connection
+            .query_row(
+                "SELECT indexeddb_progress_imported FROM local_identity WHERE singleton_id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(imported, 0);
+    }
+
+    #[test]
+    fn legacy_import_rejects_an_oversized_record_batch() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        let oversized = vec![sample_progress(&[]); MAX_LEGACY_PROGRESS_RECORDS + 1];
+        assert!(import_legacy_progress(&mut connection, &oversized).is_err());
     }
 
     #[test]
