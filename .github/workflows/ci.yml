@@ -13,38 +13,6 @@ concurrency:
   group: fluently-ci-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  h2b5-cargo-lock-bootstrap:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/h2b-5-native-sqlite' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout H2b-5 branch
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          persist-credentials: true
-
-      - name: Set up pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
-        with:
-          toolchain: "1.99.1"
-
-      - name: Generate and commit the Cargo lockfile
-        env:
-          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          cargo generate-lockfile --manifest-path apps/desktop/src-tauri/Cargo.toml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/desktop/src-tauri/Cargo.lock
-          if git diff --cached --quiet; then
-            echo "Cargo.lock is already current."
-          else
-            git commit -m "chore(windows): update H2b-5 Cargo lockfile"
-            git push origin "HEAD:${PR_BRANCH}"
-          fi
-
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -228,20 +196,6 @@ jobs:
             $icon.Dispose()
             $bitmap.Dispose()
           }
-
-      - name: Generate H2b-5 Cargo lockfile for bootstrap
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/h2b-5-native-sqlite' && github.event.pull_request.head.repo.full_name == github.repository
-        working-directory: apps/desktop/src-tauri
-        run: cargo generate-lockfile
-
-      - name: Upload generated H2b-5 Cargo lockfile
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/h2b-5-native-sqlite' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: h2b-5-generated-cargo-lock
-          path: apps/desktop/src-tauri/Cargo.lock
-          if-no-files-found: error
-          retention-days: 7
 
       - name: Verify embedded curriculum integrity tests
         working-directory: apps/desktop/src-tauri
