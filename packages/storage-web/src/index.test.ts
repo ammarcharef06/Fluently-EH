@@ -358,7 +358,8 @@ describe('Windows native progress bridge', () => {
     await expect(db.getAll('outbox')).resolves.toEqual([operation]);
     await expect(db.getAll('reviews')).resolves.toEqual([review]);
     await expect(db.get('settings', 'interfaceLocale')).resolves.toBe('ar');
-    expect(invoke).toHaveBeenCalledExactlyOnceWith('clear_local_learning_data', undefined);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith('clear_local_learning_data', undefined);
   });
 
   it('lists current native learner progress without a webview identity argument', async () => {
