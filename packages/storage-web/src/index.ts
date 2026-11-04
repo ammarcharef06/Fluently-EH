@@ -138,6 +138,7 @@ export async function readSetting(key: string): Promise<string | number | boolea
   return db.get('settings', key);
 }
 export async function clearLocalLearningData(): Promise<void> {
+  const native = await nativeInvoke<void>('clear_local_learning_data');
   const db = await openFluentlyDB();
   const tx = db.transaction(['progress', 'outbox', 'reviews', 'settings'], 'readwrite');
   await Promise.all([
@@ -147,6 +148,7 @@ export async function clearLocalLearningData(): Promise<void> {
     tx.objectStore('settings').clear()
   ]);
   await tx.done;
+  if (native.available) return;
 }
 export function requestPersistentStorage(): Promise<boolean> {
   if (!('storage' in navigator) || !navigator.storage?.persist) return Promise.resolve(false);
