@@ -133,8 +133,10 @@ describe('web IndexedDB learning storage', () => {
 });
 
 describe('Windows native progress bridge', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     delete (window as Window & { __TAURI__?: unknown }).__TAURI__;
+    const db = await openFluentlyDB();
+    await db.clear('progress');
   });
 
   it('imports existing IndexedDB progress once before saving through SQLite', async () => {
@@ -191,6 +193,33 @@ describe('Windows native progress bridge', () => {
     await expect(readLessonProgress('lesson-001')).resolves.toEqual(restored);
     expect(invoke).toHaveBeenNthCalledWith(1, 'import_legacy_lesson_progress', { progress: [] });
     expect(invoke).toHaveBeenNthCalledWith(2, 'read_lesson_progress', { lessonId: 'lesson-001' });
+  });
+
+  it('clears native SQLite progress when local learning data is deleted', async () => {
+    const legacy = {
+      lessonId: 'lesson-legacy',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-11-03T06:00:00Z',
+      contentVersion: 'content-legacy'
+    };
+    await saveLessonProgress(legacy);
+
+    const calls: Array<[string, Record<string, unknown> | undefined]> = [];
+    const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
+      calls.push([command, args]);
+      return undefined;
+    });
+    Object.defineProperty(window, '__TAURI__', {
+      configurable: true,
+      value: { core: { invoke } }
+    });
+
+    await clearLocalLearningData();
+
+    expect(calls[0]).toEqual(['import_legacy_lesson_progress', { progress: [legacy] }]);
+    expect(calls[1]).toEqual(['clear_local_learning_data', undefined]);
+    const db = await openFluentlyDB();
+    await expect(db.getAll('progress')).resolves.toEqual([]);
   });
 
   it('lists current native learner progress without a webview identity argument', async () => {
