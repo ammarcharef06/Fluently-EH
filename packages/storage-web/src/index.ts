@@ -18,11 +18,54 @@ type NativeTauriBridge = {
   };
 };
 
-function nativeInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> | undefined {
+type NativeInvocation<T> =
+  | { available: false }
+  | { available: true; value: T };
+
+let nativeProgressMigrationCore: NativeTauriBridge['core'] | undefined;
+let nativeProgressMigrationPromise: Promise<void> | undefined;
+
+function getNativeCore(): NonNullable<NativeTauriBridge['core']> | undefined {
   if (typeof window === 'undefined') return undefined;
-  const bridge = (window as Window & { __TAURI__?: NativeTauriBridge }).__TAURI__;
-  if (typeof bridge?.core?.invoke !== 'function') return undefined;
-  return bridge.core.invoke<T>(command, args);
+  const core = (window as Window & { __TAURI__?: NativeTauriBridge }).__TAURI__?.core;
+  return typeof core?.invoke === 'function' ? core : undefined;
+}
+
+async function ensureNativeProgressMigrated(
+  core: NonNullable<NativeTauriBridge['core']>
+): Promise<void> {
+  if (nativeProgressMigrationCore !== core) {
+    nativeProgressMigrationCore = core;
+    nativeProgressMigrationPromise = undefined;
+  }
+
+  if (!nativeProgressMigrationPromise) {
+    const migration = (async () => {
+      const db = await openFluentlyDB();
+      const legacyProgress = await db.getAll('progress');
+      await core.invoke<boolean>('import_legacy_lesson_progress', {
+        progress: legacyProgress
+      });
+    })();
+    nativeProgressMigrationPromise = migration;
+  }
+
+  try {
+    await nativeProgressMigrationPromise;
+  } catch (error) {
+    nativeProgressMigrationPromise = undefined;
+    throw error;
+  }
+}
+
+async function nativeInvoke<T>(
+  command: string,
+  args?: Record<string, unknown>
+): Promise<NativeInvocation<T>> {
+  const core = getNativeCore();
+  if (!core) return { available: false };
+  await ensureNativeProgressMigrated(core);
+  return { available: true, value: await core.invoke<T>(command, args) };
 }
 
 let databasePromise: Promise<IDBPDatabase<FluentlyDB>> | undefined;
@@ -44,23 +87,20 @@ export function openFluentlyDB(): Promise<IDBPDatabase<FluentlyDB>> {
   return databasePromise;
 }
 export async function saveLessonProgress(record: ProgressRecord): Promise<void> {
-  const native = nativeInvoke<void>('save_lesson_progress', { progress: record });
-  if (native) {
-    await native;
-    return;
-  }
+  const native = await nativeInvoke<void>('save_lesson_progress', { progress: record });
+  if (native.available) return;
   const db = await openFluentlyDB();
   await db.put('progress', record);
 }
 export async function readLessonProgress(lessonId: string): Promise<ProgressRecord | undefined> {
-  const native = nativeInvoke<ProgressRecord | null>('read_lesson_progress', { lessonId });
-  if (native) return (await native) ?? undefined;
+  const native = await nativeInvoke<ProgressRecord | null>('read_lesson_progress', { lessonId });
+  if (native.available) return native.value ?? undefined;
   const db = await openFluentlyDB();
   return db.get('progress', lessonId);
 }
 export async function listLessonProgress(): Promise<ProgressRecord[]> {
-  const native = nativeInvoke<ProgressRecord[]>('list_lesson_progress');
-  if (native) return native;
+  const native = await nativeInvoke<ProgressRecord[]>('list_lesson_progress');
+  if (native.available) return native.value;
   const db = await openFluentlyDB();
   return db.getAll('progress');
 }
