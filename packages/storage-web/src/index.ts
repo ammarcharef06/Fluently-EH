@@ -155,10 +155,10 @@ export async function readSetting(key: string): Promise<string | number | boolea
 }
 export async function clearLocalLearningData(): Promise<void> {
   const core = getNativeCore();
-  const db = await openFluentlyDB();
   const storeNames = ['progress', 'outbox', 'reviews', 'settings'] as const;
 
   if (!core) {
+    const db = await openFluentlyDB();
     const tx = db.transaction(storeNames, 'readwrite');
     await Promise.all([
       tx.objectStore('progress').clear(),
@@ -174,6 +174,7 @@ export async function clearLocalLearningData(): Promise<void> {
   // progress operation. Saves queued before this wipe finish first; saves
   // queued after it cannot run until the wipe and any rollback have completed.
   await withNativeOperation(async () => {
+    const db = await openFluentlyDB();
     const tx = db.transaction(storeNames, 'readwrite');
     const [progressSnapshot, outboxSnapshot, reviewSnapshot, settingSnapshot, settingKeys] =
       await Promise.all([
