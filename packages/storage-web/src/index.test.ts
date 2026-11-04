@@ -362,6 +362,68 @@ describe('Windows native progress bridge', () => {
     expect(invoke).toHaveBeenCalledWith('clear_local_learning_data');
   });
 
+  it('serializes native saves around local-data deletion', async () => {
+    let releaseFirstSave!: () => void;
+    let markFirstSaveStarted!: () => void;
+    const firstSaveStarted = new Promise<void>((resolve) => {
+      markFirstSaveStarted = resolve;
+    });
+    const firstSaveGate = new Promise<void>((resolve) => {
+      releaseFirstSave = resolve;
+    });
+    const calls: string[] = [];
+    let nativeSaveCount = 0;
+    const invoke = vi.fn(async (command: string) => {
+      calls.push(command);
+      if (command === 'import_legacy_lesson_progress') return true;
+      if (command === 'save_lesson_progress') {
+        nativeSaveCount += 1;
+        if (nativeSaveCount === 1) {
+          markFirstSaveStarted();
+          await firstSaveGate;
+        }
+        return undefined;
+      }
+      if (command === 'clear_local_learning_data') return undefined;
+      return undefined;
+    });
+    Object.defineProperty(window, '__TAURI__', {
+      configurable: true,
+      value: { core: { invoke } }
+    });
+
+    const firstSave = saveLessonProgress({
+      lessonId: 'lesson-before-wipe',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-11-04T09:00:00Z',
+      contentVersion: 'content-1'
+    });
+    await firstSaveStarted;
+
+    const wipe = clearLocalLearningData();
+    const secondSave = saveLessonProgress({
+      lessonId: 'lesson-after-wipe',
+      completedStepIds: ['step-2'],
+      updatedAt: '2026-11-04T09:01:00Z',
+      contentVersion: 'content-1'
+    });
+
+    expect(calls).toEqual([
+      'import_legacy_lesson_progress',
+      'save_lesson_progress'
+    ]);
+
+    releaseFirstSave();
+    await Promise.all([firstSave, wipe, secondSave]);
+
+    expect(calls).toEqual([
+      'import_legacy_lesson_progress',
+      'save_lesson_progress',
+      'clear_local_learning_data',
+      'save_lesson_progress'
+    ]);
+  });
+
   it('lists current native learner progress without a webview identity argument', async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === 'import_legacy_lesson_progress') return true;
