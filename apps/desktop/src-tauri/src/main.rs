@@ -142,7 +142,7 @@ struct LessonProgress {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct LessonProgressInput {
     lesson_id: String,
     completed_step_ids: Vec<String>,
@@ -521,6 +521,18 @@ mod sqlite_tests {
 
         connection.pragma_update(None, "user_version", 3).unwrap();
         assert!(initialize_database(&connection).is_err());
+    }
+
+    #[test]
+    fn native_progress_input_rejects_a_webview_supplied_learner_id() {
+        let payload = serde_json::json!({
+            "learnerId": "00000000-0000-4000-8000-000000000001",
+            "lessonId": "lesson-001",
+            "completedStepIds": ["step-1"],
+            "updatedAt": "2026-11-04T06:00:00Z",
+            "contentVersion": "content-1"
+        });
+        assert!(serde_json::from_value::<LessonProgressInput>(payload).is_err());
     }
 
     #[test]
