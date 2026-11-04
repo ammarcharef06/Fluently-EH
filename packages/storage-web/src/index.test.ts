@@ -137,8 +137,19 @@ describe('Windows native progress bridge', () => {
     delete (window as Window & { __TAURI__?: unknown }).__TAURI__;
   });
 
-  it('saves lesson progress through SQLite without accepting a learner ID', async () => {
-    const invoke = vi.fn().mockResolvedValue(undefined);
+  it('imports existing IndexedDB progress once before saving through SQLite', async () => {
+    const legacy = {
+      lessonId: 'lesson-legacy',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-11-03T06:00:00Z',
+      contentVersion: 'content-legacy'
+    };
+    await saveLessonProgress(legacy);
+
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'import_legacy_lesson_progress') return true;
+      return undefined;
+    });
     Object.defineProperty(window, '__TAURI__', {
       configurable: true,
       value: { core: { invoke } }
@@ -152,11 +163,14 @@ describe('Windows native progress bridge', () => {
     };
     await saveLessonProgress(progress);
 
-    expect(invoke).toHaveBeenCalledWith('save_lesson_progress', { progress });
-    expect(invoke.mock.calls[0]?.[1]).not.toHaveProperty('learnerId');
+    expect(invoke).toHaveBeenNthCalledWith(1, 'import_legacy_lesson_progress', {
+      progress: [legacy]
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, 'save_lesson_progress', { progress });
+    expect(invoke.mock.calls[1]?.[1]).not.toHaveProperty('learnerId');
   });
 
-  it('reads one lesson from the native local database', async () => {
+  it('reads one lesson from the native local database after the one-time migration', async () => {
     const restored = {
       learnerId: '00000000-0000-4000-8000-000000000001',
       lessonId: 'lesson-001',
@@ -164,24 +178,33 @@ describe('Windows native progress bridge', () => {
       updatedAt: '2026-11-04T06:00:00Z',
       contentVersion: 'content-1'
     };
-    const invoke = vi.fn().mockResolvedValue(restored);
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'import_legacy_lesson_progress') return true;
+      if (command === 'read_lesson_progress') return restored;
+      return undefined;
+    });
     Object.defineProperty(window, '__TAURI__', {
       configurable: true,
       value: { core: { invoke } }
     });
 
     await expect(readLessonProgress('lesson-001')).resolves.toEqual(restored);
-    expect(invoke).toHaveBeenCalledWith('read_lesson_progress', { lessonId: 'lesson-001' });
+    expect(invoke).toHaveBeenNthCalledWith(1, 'import_legacy_lesson_progress', { progress: [] });
+    expect(invoke).toHaveBeenNthCalledWith(2, 'read_lesson_progress', { lessonId: 'lesson-001' });
   });
 
-  it('lists the current native learner progress without a webview identity argument', async () => {
-    const invoke = vi.fn().mockResolvedValue([]);
+  it('lists current native learner progress without a webview identity argument', async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'import_legacy_lesson_progress') return true;
+      return [];
+    });
     Object.defineProperty(window, '__TAURI__', {
       configurable: true,
       value: { core: { invoke } }
     });
 
     await expect(listLessonProgress()).resolves.toEqual([]);
-    expect(invoke).toHaveBeenCalledWith('list_lesson_progress', undefined);
+    expect(invoke).toHaveBeenNthCalledWith(1, 'import_legacy_lesson_progress', { progress: [] });
+    expect(invoke).toHaveBeenNthCalledWith(2, 'list_lesson_progress', undefined);
   });
 });
