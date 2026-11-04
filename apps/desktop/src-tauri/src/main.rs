@@ -958,26 +958,36 @@ mod sqlite_tests {
         let path = temporary_database_path();
         let first_identity;
         {
-            let connection = open_database(&path).unwrap();
+            let mut connection = open_database(&path).unwrap();
             first_identity = get_or_create_local_learner_id(&connection).unwrap();
+            assert!(import_legacy_progress(&mut connection, &[]).unwrap());
+
+            let transaction = connection.transaction().unwrap();
+            require_legacy_progress_imported(&transaction).unwrap();
+            let command_identity = get_or_create_local_learner_id(&transaction).unwrap();
+            assert_eq!(command_identity, first_identity);
             save_progress(
-                &connection,
-                &first_identity,
+                &transaction,
+                &command_identity,
                 &sample_progress(&["step-1", "step-3"]),
             )
             .unwrap();
+            transaction.commit().unwrap();
         }
         {
-            let connection = open_database(&path).unwrap();
-            let reopened_identity = get_or_create_local_learner_id(&connection).unwrap();
+            let mut connection = open_database(&path).unwrap();
+            let transaction = connection.transaction().unwrap();
+            require_legacy_progress_imported(&transaction).unwrap();
+            let reopened_identity = get_or_create_local_learner_id(&transaction).unwrap();
             assert_eq!(reopened_identity, first_identity);
-            let restored = read_progress(&connection, &reopened_identity, "lesson-001")
+            let restored = read_progress(&transaction, &reopened_identity, "lesson-001")
                 .unwrap()
                 .unwrap();
             assert_eq!(restored.learner_id, first_identity);
             assert_eq!(restored.completed_step_ids, vec!["step-1", "step-3"]);
             assert_eq!(restored.updated_at, "2026-11-04T06:00:00Z");
             assert_eq!(restored.content_version, "content-1");
+            transaction.commit().unwrap();
         }
         let _ = fs::remove_file(&path);
         let _ = fs::remove_file(path.with_extension("sqlite3-wal"));
