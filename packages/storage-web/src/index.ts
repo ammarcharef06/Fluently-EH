@@ -46,6 +46,12 @@ async function ensureNativeProgressMigrated(
       await core.invoke<boolean>('import_legacy_lesson_progress', {
         progress: legacyProgress
       });
+
+      // SQLite has committed the one-time import marker. Only now remove the
+      // IndexedDB source so old progress cannot linger as a second authority.
+      const transaction = db.transaction('progress', 'readwrite');
+      await transaction.store.clear();
+      await transaction.done;
     })();
     nativeProgressMigrationPromise = migration;
   }
