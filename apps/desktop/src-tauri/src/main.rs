@@ -406,6 +406,33 @@ fn import_legacy_lesson_progress(
     import_legacy_progress(&mut connection, &progress).map_err(|error| error.to_string())
 }
 
+fn clear_local_progress(connection: &mut Connection) -> rusqlite::Result<()> {
+    let learner_id = get_or_create_local_learner_id(connection)?;
+    let transaction = connection.transaction()?;
+    transaction.execute(
+        "DELETE FROM lesson_progress WHERE learner_id = ?1",
+        params![learner_id],
+    )?;
+    transaction.execute(
+        "UPDATE local_identity
+         SET indexeddb_progress_imported = 1
+         WHERE singleton_id = 1",
+        [],
+    )?;
+    transaction.commit()
+}
+
+#[tauri::command]
+fn clear_local_learning_data(
+    database: tauri::State<'_, NativeDatabase>,
+) -> Result<(), String> {
+    let mut connection = database
+        .0
+        .lock()
+        .map_err(|_| "Local database lock is unavailable.".to_string())?;
+    clear_local_progress(&mut connection).map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 fn save_lesson_progress(
     database: tauri::State<'_, NativeDatabase>,
@@ -476,6 +503,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             import_legacy_lesson_progress,
+            clear_local_learning_data,
             save_lesson_progress,
             read_lesson_progress,
             list_lesson_progress
@@ -598,6 +626,27 @@ mod sqlite_tests {
             .unwrap()
             .unwrap();
         assert_eq!(still_restored.completed_step_ids, vec!["step-1", "step-2"]);
+    }
+
+    #[test]
+    fn clearing_local_learning_data_removes_progress_but_keeps_the_local_identity() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        let learner_id = get_or_create_local_learner_id(&connection).unwrap();
+        save_progress(&connection, &learner_id, &sample_progress(&["step-1"])).unwrap();
+
+        clear_local_progress(&mut connection).unwrap();
+
+        assert!(list_progress(&connection, &learner_id).unwrap().is_empty());
+        assert_eq!(get_or_create_local_learner_id(&connection).unwrap(), learner_id);
+        let imported: i64 = connection
+            .query_row(
+                "SELECT indexeddb_progress_imported FROM local_identity WHERE singleton_id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(imported, 1);
     }
 
     #[test]
