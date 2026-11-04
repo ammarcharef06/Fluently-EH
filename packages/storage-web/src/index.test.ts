@@ -17,6 +17,7 @@ import {
 
 describe('web IndexedDB learning storage', () => {
   beforeEach(async () => {
+    delete (window as Window & { __TAURI__?: unknown }).__TAURI__;
     const db = await openFluentlyDB();
     await Promise.all([
       db.clear('progress'),
