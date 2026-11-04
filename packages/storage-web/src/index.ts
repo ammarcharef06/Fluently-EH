@@ -178,13 +178,13 @@ export async function clearLocalLearningData(): Promise<void> {
   await withStorageOperation(async () => {
     const db = await openFluentlyDB();
     if (!core) {
-    const tx = db.transaction(storeNames, 'readwrite');
-    await Promise.all([
-      tx.objectStore('progress').clear(),
-      tx.objectStore('outbox').clear(),
-      tx.objectStore('reviews').clear(),
-      tx.objectStore('settings').clear()
-    ]);
+      const tx = db.transaction(storeNames, 'readwrite');
+      await Promise.all([
+        tx.objectStore('progress').clear(),
+        tx.objectStore('outbox').clear(),
+        tx.objectStore('reviews').clear(),
+        tx.objectStore('settings').clear()
+      ]);
       await tx.done;
       return;
     }
