@@ -732,11 +732,11 @@ mod sqlite_tests {
         let oversized = vec![
             LessonProgressInput {
                 lesson_id: "lesson-001".into(),
-                completed_step_ids: vec!["step".repeat(160); 1_000],
+                completed_step_ids: vec!["s".repeat(160); 1_000],
                 updated_at: "2026-11-04T06:00:00Z".into(),
                 content_version: "content-1".into(),
             };
-            100
+            110
         ];
         assert!(import_legacy_progress(&mut connection, &oversized).is_err());
     }
