@@ -53,7 +53,7 @@
 - H2b-6a مدمج في PR #38، commit `51ee38fabc5df1e10ff282bd2f3b69317ccca2ef`.
 - CI run [41873829848](https://github.com/ammarcharef06/Fluently-EH/actions/runs/41873829848) اجتاز وظيفتي `validate` و`H2b Windows build, install and runtime smoke`. شملت الأدلة إنشاء NSIS، التثبيت للمستخدم الحالي، ظهور نافذة Fluently، واختبار سلامة fixture المضمّن. ملف QA unsigned، ولا يوجد ادعاء Authenticode.
 - H2b-6a أثبت قراءة قائمة التقدم من SQLite، وPR #43 يضيف الآن توجيه save/read/list من WebView إلى SQLite مع استيراد IndexedDB السابق مرة واحدة. لا يزال دليل Windows install/runtime smoke غير مكافئ لاختبار رحلة درس فعلية بعد إغلاق التطبيق وإعادة تشغيله دون اتصال.
-- PR #43 (`implementation/h2b-6b-local-identity-v2`) يضيف جدول `local_identity` وUUID v4 مولدًا من Rust، ويرحّل schema من v1 إلى v2 مع إبقاء سجلات SQLite القديمة دون إعادة نسبتها تلقائيًا؛ كما يزيل learner_id من مدخلات أوامر Tauri، ويستورد IndexedDB القديم مرة واحدة داخل معاملة SQLite ذرية بعلامة منع تكرار، ويجعل مسح بيانات التعلم يحذف تقدم SQLite والهوية المحلية معًا. الحالة تبقى قيد التحقق حتى CI والمراجعة المستقلة واختبار التطبيق المثبت.
+- PR #43 (`implementation/h2b-6b-local-identity-v2`) يضيف جدول `local_identity` وUUID v4 مولدًا من Rust، ويرحّل schema من v1 إلى v2 مع إبقاء سجلات SQLite القديمة دون إعادة نسبتها تلقائيًا؛ كما يزيل learner_id من مدخلات أوامر Tauri، ويستورد IndexedDB القديم مرة واحدة داخل معاملة SQLite ذرية بعلامة منع تكرار، ويجعل مسح بيانات التعلم يحذف جميع صفوف تقدم SQLite، بما فيها الصفوف القديمة المحفوظة أثناء الترحيل، والهوية المحلية في معاملة واحدة. الحالة تبقى قيد التحقق حتى CI والمراجعة المستقلة واختبار التطبيق المثبت.
 
 ## دليل H2a — Android
 
