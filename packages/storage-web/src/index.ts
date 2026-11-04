@@ -207,8 +207,9 @@ export async function clearLocalLearningData(): Promise<void> {
       await Promise.all(restoreRequests);
       await rollback.done;
     } catch (rollbackError) {
-      throw new Error(
-        `Native local-data deletion failed (${String(error)}); IndexedDB restoration also failed (${String(rollbackError)}).`
+      throw new AggregateError(
+        [error, rollbackError],
+        'Native local-data deletion and IndexedDB restoration both failed.'
       );
     }
     throw error;
