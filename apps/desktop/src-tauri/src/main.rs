@@ -174,12 +174,30 @@ fn open_database(path: &Path) -> rusqlite::Result<Connection> {
     Ok(connection)
 }
 
-fn save_progress(connection: &Connection, progress: &LessonProgress) -> rusqlite::Result<()> {
-    if progress.learner_id.trim().is_empty() || progress.lesson_id.trim().is_empty() {
-        return Err(rusqlite::Error::InvalidParameterName(
-            "learner_id and lesson_id must not be empty".into(),
-        ));
+fn validate_identifier(value: &str, field: &str, maximum_bytes: usize) -> rusqlite::Result<()> {
+    if value.trim().is_empty()
+        || value.len() > maximum_bytes
+        || value.trim() != value
+        || value.chars().any(char::is_control)
+    {
+        return Err(rusqlite::Error::InvalidParameterName(format!(
+            "{field} must be non-empty, trimmed, free of control characters, and at most {maximum_bytes} bytes"
+        )));
     }
+    Ok(())
+}
+
+fn validate_learner_id(learner_id: &str) -> rusqlite::Result<()> {
+    validate_identifier(learner_id, "learner_id", 128)
+}
+
+fn validate_lesson_id(lesson_id: &str) -> rusqlite::Result<()> {
+    validate_identifier(lesson_id, "lesson_id", 160)
+}
+
+fn save_progress(connection: &Connection, progress: &LessonProgress) -> rusqlite::Result<()> {
+    validate_learner_id(&progress.learner_id)?;
+    validate_lesson_id(&progress.lesson_id)?;
     let completed = serde_json::to_string(&progress.completed_step_ids)
         .map_err(|_| rusqlite::Error::InvalidQuery)?;
     connection.execute(
@@ -206,6 +224,8 @@ fn read_progress(
     learner_id: &str,
     lesson_id: &str,
 ) -> rusqlite::Result<Option<LessonProgress>> {
+    validate_learner_id(learner_id)?;
+    validate_lesson_id(lesson_id)?;
     connection
         .query_row(
             "SELECT learner_id, lesson_id, completed_step_ids_json, updated_at, content_version
@@ -227,6 +247,27 @@ fn read_progress(
         .optional()
 }
 
+fn list_progress(connection: &Connection, learner_id: &str) -> rusqlite::Result<Vec<LessonProgress>> {
+    validate_learner_id(learner_id)?;
+    let mut statement = connection.prepare(
+        "SELECT learner_id, lesson_id, completed_step_ids_json, updated_at, content_version
+         FROM lesson_progress WHERE learner_id = ?1 ORDER BY lesson_id ASC",
+    )?;
+    let rows = statement.query_map(params![learner_id], |row| {
+        let completed_json: String = row.get(2)?;
+        let completed_step_ids = serde_json::from_str(&completed_json)
+            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+        Ok(LessonProgress {
+            learner_id: row.get(0)?,
+            lesson_id: row.get(1)?,
+            completed_step_ids,
+            updated_at: row.get(3)?,
+            content_version: row.get(4)?,
+        })
+    })?;
+    rows.collect()
+}
+
 #[tauri::command]
 fn save_lesson_progress(
     database: tauri::State<'_, NativeDatabase>,
@@ -244,6 +285,15 @@ fn read_lesson_progress(
 ) -> Result<Option<LessonProgress>, String> {
     let connection = database.0.lock().map_err(|_| "Local database lock is unavailable.".to_string())?;
     read_progress(&connection, &learner_id, &lesson_id).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_lesson_progress(
+    database: tauri::State<'_, NativeDatabase>,
+    learner_id: String,
+) -> Result<Vec<LessonProgress>, String> {
+    let connection = database.0.lock().map_err(|_| "Local database lock is unavailable.".to_string())?;
+    list_progress(&connection, &learner_id).map_err(|error| error.to_string())
 }
 
 fn main() {
@@ -274,7 +324,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             save_lesson_progress,
-            read_lesson_progress
+            read_lesson_progress,
+            list_lesson_progress
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Fluently desktop application");
@@ -393,13 +444,58 @@ mod sqlite_tests {
     }
 
     #[test]
-    fn rejects_empty_learner_or_lesson_identifiers() {
+    fn rejects_empty_or_malformed_learner_and_lesson_identifiers() {
         let connection = Connection::open_in_memory().unwrap();
         initialize_database(&connection).unwrap();
+
         assert!(save_progress(&connection, &sample_progress(" ", &[])).is_err());
+        assert!(save_progress(&connection, &sample_progress(" learner-a", &[])).is_err());
+        assert!(save_progress(&connection, &sample_progress("learner-a\\n", &[])).is_err());
+        assert!(save_progress(&connection, &sample_progress(&"x".repeat(129), &[])).is_err());
+
         let mut invalid = sample_progress("learner-a", &[]);
         invalid.lesson_id = "".into();
         assert!(save_progress(&connection, &invalid).is_err());
+        invalid.lesson_id = " lesson-001".into();
+        assert!(save_progress(&connection, &invalid).is_err());
+        invalid.lesson_id = "x".repeat(161);
+        assert!(save_progress(&connection, &invalid).is_err());
+    }
+
+    #[test]
+    fn lists_only_the_selected_learners_progress_in_stable_lesson_order() {
+        let connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+
+        let mut learner_a_second = sample_progress("learner-a", &["step-2"]);
+        learner_a_second.lesson_id = "lesson-002".into();
+        let mut learner_a_first = sample_progress("learner-a", &["step-1"]);
+        learner_a_first.lesson_id = "lesson-001".into();
+        let learner_b = sample_progress("learner-b", &["private-step"]);
+
+        save_progress(&connection, &learner_a_second).unwrap();
+        save_progress(&connection, &learner_b).unwrap();
+        save_progress(&connection, &learner_a_first).unwrap();
+
+        let listed = list_progress(&connection, "learner-a").unwrap();
+        assert_eq!(
+            listed.iter().map(|item| item.lesson_id.as_str()).collect::<Vec<_>>(),
+            vec!["lesson-001", "lesson-002"]
+        );
+        assert!(listed.iter().all(|item| item.learner_id == "learner-a"));
+        assert_eq!(listed[0].completed_step_ids, vec!["step-1"]);
+        assert_eq!(listed[1].completed_step_ids, vec!["step-2"]);
+        assert!(list_progress(&connection, "learner-with-no-progress").unwrap().is_empty());
+    }
+
+    #[test]
+    fn read_and_list_reject_invalid_identifiers() {
+        let connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+
+        assert!(read_progress(&connection, " ", "lesson-001").is_err());
+        assert!(read_progress(&connection, "learner-a", "lesson-001\\n").is_err());
+        assert!(list_progress(&connection, &"x".repeat(129)).is_err());
     }
 
     #[test]
