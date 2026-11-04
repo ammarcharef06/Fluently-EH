@@ -153,44 +153,53 @@ struct LessonProgressInput {
 const CURRENT_DATABASE_VERSION: i64 = 2;
 
 fn initialize_database(connection: &Connection) -> rusqlite::Result<()> {
-    let mut version: i64 =
-        connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
-    if version > CURRENT_DATABASE_VERSION {
-        return Err(rusqlite::Error::InvalidQuery);
-    }
+    // Serialize schema inspection and migration so two first-run processes cannot
+    // both observe the same old user_version and race to create the same tables.
+    connection.execute_batch("BEGIN IMMEDIATE;")?;
+    let migration_result = (|| {
+        let mut version: i64 =
+            connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        if version > CURRENT_DATABASE_VERSION {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
 
-    if version == 0 {
-        connection.execute_batch(
-            "BEGIN IMMEDIATE;
-             CREATE TABLE lesson_progress (
-                 learner_id TEXT NOT NULL CHECK(length(trim(learner_id)) > 0),
-                 lesson_id TEXT NOT NULL CHECK(length(trim(lesson_id)) > 0),
-                 completed_step_ids_json TEXT NOT NULL CHECK(json_valid(completed_step_ids_json)),
-                 updated_at TEXT NOT NULL,
-                 content_version TEXT NOT NULL,
-                 PRIMARY KEY (learner_id, lesson_id)
-             );
-             PRAGMA user_version = 1;
-             COMMIT;",
-        )?;
-        version = 1;
-    }
+        if version == 0 {
+            connection.execute_batch(
+                "CREATE TABLE lesson_progress (
+                     learner_id TEXT NOT NULL CHECK(length(trim(learner_id)) > 0),
+                     lesson_id TEXT NOT NULL CHECK(length(trim(lesson_id)) > 0),
+                     completed_step_ids_json TEXT NOT NULL CHECK(json_valid(completed_step_ids_json)),
+                     updated_at TEXT NOT NULL,
+                     content_version TEXT NOT NULL,
+                     PRIMARY KEY (learner_id, lesson_id)
+                 );
+                 PRAGMA user_version = 1;",
+            )?;
+            version = 1;
+        }
 
-    if version == 1 {
-        connection.execute_batch(
-            "BEGIN IMMEDIATE;
-             CREATE TABLE local_identity (
-                 singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
-                 learner_id TEXT NOT NULL UNIQUE CHECK(length(learner_id) = 36),
-                 indexeddb_progress_imported INTEGER NOT NULL DEFAULT 0
-                     CHECK(indexeddb_progress_imported IN (0, 1))
-             );
-             PRAGMA user_version = 2;
-             COMMIT;",
-        )?;
-    }
+        if version == 1 {
+            connection.execute_batch(
+                "CREATE TABLE local_identity (
+                     singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
+                     learner_id TEXT NOT NULL UNIQUE CHECK(length(learner_id) = 36),
+                     indexeddb_progress_imported INTEGER NOT NULL DEFAULT 0
+                         CHECK(indexeddb_progress_imported IN (0, 1))
+                 );
+                 PRAGMA user_version = 2;",
+            )?;
+        }
 
-    Ok(())
+        Ok(())
+    })();
+
+    match migration_result {
+        Ok(()) => connection.execute_batch("COMMIT;"),
+        Err(error) => {
+            let _ = connection.execute_batch("ROLLBACK;");
+            Err(error)
+        }
+    }
 }
 
 fn open_database(path: &Path) -> rusqlite::Result<Connection> {
@@ -627,7 +636,7 @@ mod sqlite_tests {
     }
 
     #[test]
-    fn clearing_local_learning_data_removes_progress_but_keeps_the_local_identity() {
+    fn clearing_local_learning_data_removes_progress_and_rotates_the_local_identity() {
         let mut connection = Connection::open_in_memory().unwrap();
         initialize_database(&connection).unwrap();
         let learner_id = get_or_create_local_learner_id(&connection).unwrap();
