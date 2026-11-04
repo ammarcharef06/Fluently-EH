@@ -25,9 +25,9 @@ type NativeInvocation<T> =
 let nativeProgressMigrationCore: NativeTauriBridge['core'] | undefined;
 let nativeProgressMigrationPromise: Promise<void> | undefined;
 
-let nativeOperationQueue: Promise<void> = Promise.resolve();
+let storageOperationQueue: Promise<void> = Promise.resolve();
 
-function withNativeOperation<T>(operation: () => Promise<T>): Promise<T> {
+function withStorageOperation<T>(operation: () => Promise<T>): Promise<T> {
   const result = nativeOperationQueue.then(operation, operation);
   nativeOperationQueue = result.then(() => undefined, () => undefined);
   return result;
@@ -78,10 +78,8 @@ async function nativeInvoke<T>(
 ): Promise<NativeInvocation<T>> {
   const core = getNativeCore();
   if (!core) return { available: false };
-  return withNativeOperation(async () => {
-    await ensureNativeProgressMigrated(core);
-    return { available: true, value: await core.invoke<T>(command, args) };
-  });
+  await ensureNativeProgressMigrated(core);
+  return { available: true, value: await core.invoke<T>(command, args) };
 }
 
 let databasePromise: Promise<IDBPDatabase<FluentlyDB>> | undefined;
@@ -103,62 +101,83 @@ export function openFluentlyDB(): Promise<IDBPDatabase<FluentlyDB>> {
   return databasePromise;
 }
 export async function saveLessonProgress(record: ProgressRecord): Promise<void> {
-  const native = await nativeInvoke<void>('save_lesson_progress', { progress: record });
-  if (native.available) return;
-  const db = await openFluentlyDB();
-  await db.put('progress', record);
+  await withStorageOperation(async () => {
+    const native = await nativeInvoke<void>('save_lesson_progress', { progress: record });
+    if (native.available) return;
+    const db = await openFluentlyDB();
+    await db.put('progress', record);
+  });
 }
 export async function readLessonProgress(lessonId: string): Promise<ProgressRecord | undefined> {
-  const native = await nativeInvoke<ProgressRecord | null>('read_lesson_progress', { lessonId });
-  if (native.available) return native.value ?? undefined;
-  const db = await openFluentlyDB();
-  return db.get('progress', lessonId);
+  return withStorageOperation(async () => {
+    const native = await nativeInvoke<ProgressRecord | null>('read_lesson_progress', { lessonId });
+    if (native.available) return native.value ?? undefined;
+    const db = await openFluentlyDB();
+    return db.get('progress', lessonId);
+  });
 }
 export async function listLessonProgress(): Promise<ProgressRecord[]> {
-  const native = await nativeInvoke<ProgressRecord[]>('list_lesson_progress');
-  if (native.available) return native.value;
-  const db = await openFluentlyDB();
-  return db.getAll('progress');
+  return withStorageOperation(async () => {
+    const native = await nativeInvoke<ProgressRecord[]>('list_lesson_progress');
+    if (native.available) return native.value;
+    const db = await openFluentlyDB();
+    return db.getAll('progress');
+  });
 }
 export async function enqueueOperation(operation: SyncOperation): Promise<void> {
-  const db = await openFluentlyDB();
-  await db.put('outbox', operation);
+  await withStorageOperation(async () => {
+    const db = await openFluentlyDB();
+    await db.put('outbox', operation);
+  });
 }
 export async function pendingOperations(limit = 100): Promise<SyncOperation[]> {
-  const db = await openFluentlyDB();
-  return (await db.getAll('outbox')).filter((item) => item.status === 'pending').slice(0, limit);
+  return withStorageOperation(async () => {
+    const db = await openFluentlyDB();
+    return (await db.getAll('outbox')).filter((item) => item.status === 'pending').slice(0, limit);
+  });
 }
 export async function acknowledgeOperations(operationIds: readonly string[]): Promise<void> {
-  const db = await openFluentlyDB();
-  const tx = db.transaction('outbox', 'readwrite');
-  for (const operationId of operationIds) {
-    const operation = await tx.store.get(operationId);
-    if (operation) await tx.store.put({ ...operation, status: 'acknowledged' });
-  }
-  await tx.done;
+  await withStorageOperation(async () => {
+    const db = await openFluentlyDB();
+    const tx = db.transaction('outbox', 'readwrite');
+    for (const operationId of operationIds) {
+      const operation = await tx.store.get(operationId);
+      if (operation) await tx.store.put({ ...operation, status: 'acknowledged' });
+    }
+    await tx.done;
+  });
 }
 export async function saveReviewState(record: ReviewRecord): Promise<void> {
-  const db = await openFluentlyDB();
-  await db.put('reviews', record);
+  await withStorageOperation(async () => {
+    const db = await openFluentlyDB();
+    await db.put('reviews', record);
+  });
 }
 export async function listReviewStates(): Promise<ReviewRecord[]> {
-  const db = await openFluentlyDB();
-  return db.getAll('reviews');
+  return withStorageOperation(async () => {
+    const db = await openFluentlyDB();
+    return db.getAll('reviews');
+  });
 }
 export async function saveSetting(key: string, value: string | number | boolean): Promise<void> {
-  const db = await openFluentlyDB();
-  await db.put('settings', value, key);
+  await withStorageOperation(async () => {
+    const db = await openFluentlyDB();
+    await db.put('settings', value, key);
+  });
 }
 export async function readSetting(key: string): Promise<string | number | boolean | undefined> {
-  const db = await openFluentlyDB();
-  return db.get('settings', key);
+  return withStorageOperation(async () => {
+    const db = await openFluentlyDB();
+    return db.get('settings', key);
+  });
 }
 export async function clearLocalLearningData(): Promise<void> {
   const core = getNativeCore();
   const storeNames = ['progress', 'outbox', 'reviews', 'settings'] as const;
 
-  if (!core) {
+  await withStorageOperation(async () => {
     const db = await openFluentlyDB();
+    if (!core) {
     const tx = db.transaction(storeNames, 'readwrite');
     await Promise.all([
       tx.objectStore('progress').clear(),
@@ -166,15 +185,11 @@ export async function clearLocalLearningData(): Promise<void> {
       tx.objectStore('reviews').clear(),
       tx.objectStore('settings').clear()
     ]);
-    await tx.done;
-    return;
-  }
+      await tx.done;
+      return;
+    }
 
-  // Serialize the complete snapshot/wipe/rollback sequence with every native
-  // progress operation. Saves queued before this wipe finish first; saves
-  // queued after it cannot run until the wipe and any rollback have completed.
-  await withNativeOperation(async () => {
-    const db = await openFluentlyDB();
+    // Serialize all storage reads and writes with the snapshot/wipe/rollback sequence.
     const tx = db.transaction(storeNames, 'readwrite');
     const [progressSnapshot, outboxSnapshot, reviewSnapshot, settingSnapshot, settingKeys] =
       await Promise.all([
