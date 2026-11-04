@@ -210,7 +210,7 @@ export async function clearLocalLearningData(): Promise<void> {
       throw new AggregateError(
         [error, rollbackError],
         'Native local-data deletion and IndexedDB restoration both failed.',
-        { cause: error }
+        { cause: rollbackError }
       );
     }
     throw error;
