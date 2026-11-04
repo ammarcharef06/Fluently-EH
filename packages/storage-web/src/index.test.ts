@@ -216,10 +216,19 @@ describe('Windows native progress bridge', () => {
 
     await clearLocalLearningData();
 
-    expect(calls[0]).toEqual(['import_legacy_lesson_progress', { progress: [legacy] }]);
+    expect(calls[0]).toEqual(['import_legacy_lesson_progress', { progress: [] }]);
     expect(calls[1]).toEqual(['clear_local_learning_data', undefined]);
     const db = await openFluentlyDB();
     await expect(db.getAll('progress')).resolves.toEqual([]);
+
+    await saveLessonProgress({
+      lessonId: 'lesson-after-clear',
+      completedStepIds: ['step-new'],
+      updatedAt: '2026-11-04T07:00:00Z',
+      contentVersion: 'content-2'
+    });
+    expect(calls[2]).toEqual(['import_legacy_lesson_progress', { progress: [] }]);
+    expect(calls[3]?.[0]).toBe('save_lesson_progress');
   });
 
   it('lists current native learner progress without a webview identity argument', async () => {
