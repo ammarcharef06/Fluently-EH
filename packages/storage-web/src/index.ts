@@ -12,6 +12,19 @@ interface FluentlyDB extends DBSchema {
   curriculumPackages: { key: string; value: { packageId: string; contentVersion: string; manifest: CurriculumManifest; activatedAt: string } };
   curriculumFiles: { key: string; value: { id: string; packageId: string; path: string; contentVersion: string; bytes: ArrayBuffer; sha256: string } };
 }
+type NativeTauriBridge = {
+  core?: {
+    invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
+  };
+};
+
+function nativeInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const bridge = (window as Window & { __TAURI__?: NativeTauriBridge }).__TAURI__;
+  if (typeof bridge?.core?.invoke !== 'function') return undefined;
+  return bridge.core.invoke<T>(command, args);
+}
+
 let databasePromise: Promise<IDBPDatabase<FluentlyDB>> | undefined;
 
 export function openFluentlyDB(): Promise<IDBPDatabase<FluentlyDB>> {
@@ -31,14 +44,23 @@ export function openFluentlyDB(): Promise<IDBPDatabase<FluentlyDB>> {
   return databasePromise;
 }
 export async function saveLessonProgress(record: ProgressRecord): Promise<void> {
+  const native = nativeInvoke<void>('save_lesson_progress', { progress: record });
+  if (native) {
+    await native;
+    return;
+  }
   const db = await openFluentlyDB();
   await db.put('progress', record);
 }
 export async function readLessonProgress(lessonId: string): Promise<ProgressRecord | undefined> {
+  const native = nativeInvoke<ProgressRecord | null>('read_lesson_progress', { lessonId });
+  if (native) return (await native) ?? undefined;
   const db = await openFluentlyDB();
   return db.get('progress', lessonId);
 }
 export async function listLessonProgress(): Promise<ProgressRecord[]> {
+  const native = nativeInvoke<ProgressRecord[]>('list_lesson_progress');
+  if (native) return native;
   const db = await openFluentlyDB();
   return db.getAll('progress');
 }
