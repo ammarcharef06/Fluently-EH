@@ -250,6 +250,33 @@ fn validate_lesson_id(lesson_id: &str) -> rusqlite::Result<()> {
     validate_identifier(lesson_id, "lesson_id", 160)
 }
 
+const MAX_COMPLETED_STEPS_PER_LESSON: usize = 2_000;
+const MAX_PROGRESS_RECORD_BYTES: usize = 256 * 1024;
+const MAX_LEGACY_PROGRESS_BYTES: usize = 16 * 1024 * 1024;
+
+fn validate_progress_input(progress: &LessonProgressInput) -> rusqlite::Result<usize> {
+    validate_lesson_id(&progress.lesson_id)?;
+    validate_identifier(&progress.updated_at, "updated_at", 64)?;
+    validate_identifier(&progress.content_version, "content_version", 128)?;
+
+    if progress.completed_step_ids.len() > MAX_COMPLETED_STEPS_PER_LESSON {
+        return Err(rusqlite::Error::InvalidParameterName(
+            "completed_step_ids exceeds the allowed number of steps.".into(),
+        ));
+    }
+    for step_id in &progress.completed_step_ids {
+        validate_identifier(step_id, "completed_step_id", 160)?;
+    }
+
+    let serialized = serde_json::to_vec(progress).map_err(|_| rusqlite::Error::InvalidQuery)?;
+    if serialized.len() > MAX_PROGRESS_RECORD_BYTES {
+        return Err(rusqlite::Error::InvalidParameterName(
+            "Lesson progress record exceeds the allowed size.".into(),
+        ));
+    }
+    Ok(serialized.len())
+}
+
 fn get_or_create_local_learner_id(connection: &Connection) -> rusqlite::Result<String> {
     let existing: Option<String> = connection
         .query_row(
@@ -290,7 +317,7 @@ fn save_progress(
     progress: &LessonProgressInput,
 ) -> rusqlite::Result<()> {
     validate_learner_id(learner_id)?;
-    validate_lesson_id(&progress.lesson_id)?;
+    validate_progress_input(progress)?;
     let completed = serde_json::to_string(&progress.completed_step_ids)
         .map_err(|_| rusqlite::Error::InvalidQuery)?;
     connection.execute(
@@ -374,6 +401,19 @@ fn import_legacy_progress(
         return Err(rusqlite::Error::InvalidParameterName(
             "Too many legacy lesson progress records to import at once.".into(),
         ));
+    }
+
+    let mut total_bytes = 0usize;
+    for record in progress {
+        let record_bytes = validate_progress_input(record)?;
+        total_bytes = total_bytes
+            .checked_add(record_bytes)
+            .ok_or(rusqlite::Error::InvalidQuery)?;
+        if total_bytes > MAX_LEGACY_PROGRESS_BYTES {
+            return Err(rusqlite::Error::InvalidParameterName(
+                "Legacy lesson progress batch exceeds the allowed size.".into(),
+            ));
+        }
     }
 
     let learner_id = get_or_create_local_learner_id(connection)?;
@@ -667,6 +707,38 @@ mod sqlite_tests {
             )
             .unwrap();
         assert_eq!(imported, 0);
+    }
+
+    #[test]
+    fn progress_inputs_are_bounded_and_reject_invalid_step_identifiers() {
+        let mut progress = sample_progress(&["step-1"]);
+        assert!(validate_progress_input(&progress).is_ok());
+
+        progress.completed_step_ids = vec!["step".into(); MAX_COMPLETED_STEPS_PER_LESSON + 1];
+        assert!(validate_progress_input(&progress).is_err());
+
+        progress.completed_step_ids = vec!["".into()];
+        assert!(validate_progress_input(&progress).is_err());
+
+        progress.completed_step_ids = vec!["step-1".into()];
+        progress.updated_at = "x".repeat(65);
+        assert!(validate_progress_input(&progress).is_err());
+    }
+
+    #[test]
+    fn legacy_import_rejects_a_batch_that_exceeds_the_byte_limit() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        let oversized = vec![
+            LessonProgressInput {
+                lesson_id: "lesson-001".into(),
+                completed_step_ids: vec!["step".repeat(160); 1_000],
+                updated_at: "2026-11-04T06:00:00Z".into(),
+                content_version: "content-1".into(),
+            };
+            100
+        ];
+        assert!(import_legacy_progress(&mut connection, &oversized).is_err());
     }
 
     #[test]
