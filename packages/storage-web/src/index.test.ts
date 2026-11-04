@@ -401,6 +401,7 @@ describe('Windows native progress bridge', () => {
     await firstSaveStarted;
 
     const wipe = clearLocalLearningData();
+    const settingAfterWipe = saveSetting('postWipeSetting', 'preserved');
     const secondSave = saveLessonProgress({
       lessonId: 'lesson-after-wipe',
       completedStepIds: ['step-2'],
@@ -414,7 +415,10 @@ describe('Windows native progress bridge', () => {
     ]);
 
     releaseFirstSave();
-    await Promise.all([firstSave, wipe, secondSave]);
+    await Promise.all([firstSave, wipe, settingAfterWipe, secondSave]);
+
+    const db = await openFluentlyDB();
+    await expect(db.get('settings', 'postWipeSetting')).resolves.toBe('preserved');
 
     expect(calls).toEqual([
       'import_legacy_lesson_progress',
