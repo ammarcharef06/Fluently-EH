@@ -171,6 +171,49 @@ describe('Windows native progress bridge', () => {
     });
     expect(invoke).toHaveBeenNthCalledWith(2, 'save_lesson_progress', { progress });
     expect(invoke.mock.calls[1]?.[1]).not.toHaveProperty('learnerId');
+    const db = await openFluentlyDB();
+    await expect(db.getAll('progress')).resolves.toEqual([]);
+  });
+
+  it('retains IndexedDB progress when import fails and clears it only after a successful retry', async () => {
+    const legacy = {
+      lessonId: 'lesson-retry',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-11-03T06:00:00Z',
+      contentVersion: 'content-legacy'
+    };
+    await saveLessonProgress(legacy);
+
+    let importAttempts = 0;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'import_legacy_lesson_progress') {
+        importAttempts += 1;
+        if (importAttempts === 1) throw new Error('temporary SQLite import failure');
+        return true;
+      }
+      return undefined;
+    });
+    Object.defineProperty(window, '__TAURI__', {
+      configurable: true,
+      value: { core: { invoke } }
+    });
+
+    const current = {
+      lessonId: 'lesson-current',
+      completedStepIds: ['step-2'],
+      updatedAt: '2026-11-04T06:00:00Z',
+      contentVersion: 'content-1'
+    };
+
+    await expect(saveLessonProgress(current)).rejects.toThrow('temporary SQLite import failure');
+    const db = await openFluentlyDB();
+    await expect(db.getAll('progress')).resolves.toEqual([legacy]);
+
+    await expect(saveLessonProgress(current)).resolves.toBeUndefined();
+    expect(importAttempts).toBe(2);
+    expect(invoke).toHaveBeenCalledTimes(3);
+    await expect(db.getAll('progress')).resolves.toEqual([]);
+    expect(invoke).toHaveBeenLastCalledWith('save_lesson_progress', { progress: current });
   });
 
   it('reads one lesson from the native local database after the one-time migration', async () => {
