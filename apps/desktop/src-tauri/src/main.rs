@@ -395,6 +395,42 @@ fn list_lesson_progress(
 }
 
 
+fn main() {
+    tauri::Builder::default()
+        .setup(|app| {
+            if let Err(error) = verify_embedded_curriculum(app.handle()) {
+                eprintln!("Fluently startup blocked: {error}");
+                // The application must never continue after an integrity failure.
+                std::process::exit(1);
+            }
+
+            let database_path = match app.path().app_data_dir() {
+                Ok(directory) => directory.join("fluently.sqlite3"),
+                Err(error) => {
+                    eprintln!("Fluently local database path unavailable: {error}");
+                    std::process::exit(1);
+                }
+            };
+            let connection = match open_database(&database_path) {
+                Ok(connection) => connection,
+                Err(error) => {
+                    eprintln!("Fluently local database initialization failed: {error}");
+                    std::process::exit(1);
+                }
+            };
+            app.manage(NativeDatabase(Mutex::new(connection)));
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            save_lesson_progress,
+            read_lesson_progress,
+            list_lesson_progress
+        ])
+        .run(tauri::generate_context!())
+        .expect("failed to run Fluently desktop application");
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
