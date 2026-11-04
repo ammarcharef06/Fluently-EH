@@ -197,6 +197,20 @@ jobs:
             $bitmap.Dispose()
           }
 
+      - name: Generate H2b-5 Cargo lockfile for bootstrap
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/h2b-5-native-sqlite' && github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: apps/desktop/src-tauri
+        run: cargo generate-lockfile
+
+      - name: Upload generated H2b-5 Cargo lockfile
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/h2b-5-native-sqlite' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: h2b-5-generated-cargo-lock
+          path: apps/desktop/src-tauri/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Verify embedded curriculum integrity tests
         working-directory: apps/desktop/src-tauri
         run: cargo test --locked --target x86_64-pc-windows-msvc
