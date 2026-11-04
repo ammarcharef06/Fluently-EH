@@ -311,6 +311,56 @@ describe('Windows native progress bridge', () => {
     await expect(db.getAll('progress')).resolves.toEqual([]);
   });
 
+  it('restores IndexedDB learning data when the native wipe fails', async () => {
+    const progress = {
+      lessonId: 'lesson-rollback',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-11-03T06:00:00Z',
+      contentVersion: 'content-legacy'
+    };
+    const operation = {
+      operationId: 'op-rollback',
+      entityId: 'lesson-rollback',
+      entityType: 'lesson_attempt' as const,
+      schemaVersion: 1 as const,
+      occurredAtLocal: '2026-11-03T06:00:00Z',
+      payload: { correct: true },
+      status: 'pending' as const
+    };
+    const review = {
+      itemId: 'question-rollback',
+      repetitions: 1,
+      intervalDays: 1,
+      ease: 2.5,
+      dueAt: '2026-11-04T06:00:00Z',
+      version: 'fluently-srs-1' as const
+    };
+    await saveLessonProgress(progress);
+    await enqueueOperation(operation);
+    await saveReviewState(review);
+    await saveSetting('interfaceLocale', 'ar');
+
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'clear_local_learning_data') {
+        throw new Error('SQLite wipe failed');
+      }
+      return undefined;
+    });
+    Object.defineProperty(window, '__TAURI__', {
+      configurable: true,
+      value: { core: { invoke } }
+    });
+
+    await expect(clearLocalLearningData()).rejects.toThrow('SQLite wipe failed');
+
+    const db = await openFluentlyDB();
+    await expect(db.getAll('progress')).resolves.toEqual([progress]);
+    await expect(db.getAll('outbox')).resolves.toEqual([operation]);
+    await expect(db.getAll('reviews')).resolves.toEqual([review]);
+    await expect(db.get('settings', 'interfaceLocale')).resolves.toBe('ar');
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('clear_local_learning_data', undefined);
+  });
+
   it('lists current native learner progress without a webview identity argument', async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === 'import_legacy_lesson_progress') return true;
