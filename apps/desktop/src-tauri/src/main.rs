@@ -414,9 +414,7 @@ fn clear_local_progress(connection: &mut Connection) -> rusqlite::Result<()> {
         params![learner_id],
     )?;
     transaction.execute(
-        "UPDATE local_identity
-         SET indexeddb_progress_imported = 1
-         WHERE singleton_id = 1",
+        "DELETE FROM local_identity WHERE singleton_id = 1",
         [],
     )?;
     transaction.commit()
@@ -638,15 +636,8 @@ mod sqlite_tests {
         clear_local_progress(&mut connection).unwrap();
 
         assert!(list_progress(&connection, &learner_id).unwrap().is_empty());
-        assert_eq!(get_or_create_local_learner_id(&connection).unwrap(), learner_id);
-        let imported: i64 = connection
-            .query_row(
-                "SELECT indexeddb_progress_imported FROM local_identity WHERE singleton_id = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(imported, 1);
+        let next_identity = get_or_create_local_learner_id(&connection).unwrap();
+        assert_ne!(next_identity, learner_id);
     }
 
     #[test]
