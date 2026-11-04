@@ -731,7 +731,7 @@ mod sqlite_tests {
     }
 
     #[test]
-    fn failed_legacy_import_does_not_mark_the_migration_complete() {
+    fn invalid_legacy_import_does_not_mark_the_migration_complete() {
         let mut connection = Connection::open_in_memory().unwrap();
         initialize_database(&connection).unwrap();
         get_or_create_local_learner_id(&connection).unwrap();
@@ -740,6 +740,44 @@ mod sqlite_tests {
         invalid_record.lesson_id = " ".into();
 
         assert!(import_legacy_progress(&mut connection, &[invalid_record]).is_err());
+
+        let imported: i64 = connection
+            .query_row(
+                "SELECT indexeddb_progress_imported FROM local_identity WHERE singleton_id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(imported, 0);
+    }
+
+    #[test]
+    fn legacy_import_rolls_back_all_rows_when_a_database_write_fails_mid_transaction() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+        get_or_create_local_learner_id(&connection).unwrap();
+
+        connection
+            .execute_batch(
+                "CREATE TRIGGER reject_second_legacy_lesson
+                 BEFORE INSERT ON lesson_progress
+                 WHEN NEW.lesson_id = 'lesson-002'
+                 BEGIN
+                     SELECT RAISE(ABORT, 'forced import write failure');
+                 END;",
+            )
+            .unwrap();
+
+        let first = sample_progress(&["step-1"]);
+        let mut second = sample_progress(&["step-2"]);
+        second.lesson_id = "lesson-002".into();
+
+        assert!(import_legacy_progress(&mut connection, &[first, second]).is_err());
+
+        let progress_rows: i64 = connection
+            .query_row("SELECT COUNT(*) FROM lesson_progress", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(progress_rows, 0);
 
         let imported: i64 = connection
             .query_row(
