@@ -420,6 +420,7 @@ describe('Windows native progress bridge', () => {
       'import_legacy_lesson_progress',
       'save_lesson_progress',
       'clear_local_learning_data',
+      'import_legacy_lesson_progress',
       'save_lesson_progress'
     ]);
   });
