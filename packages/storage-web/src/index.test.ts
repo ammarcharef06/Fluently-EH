@@ -148,7 +148,7 @@ describe('Windows native progress bridge', () => {
     };
     await saveLessonProgress(legacy);
 
-    const invoke = vi.fn(async (command: string) => {
+    const invoke = vi.fn(async (command: string, _args?: Record<string, unknown>) => {
       if (command === 'import_legacy_lesson_progress') return true;
       return undefined;
     });
