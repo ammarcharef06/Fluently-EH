@@ -36,7 +36,7 @@ The QA installer and executable are unsigned internal artifacts. They are not st
 - The Rust/Tauri runtime owns one anonymous local learner identity per Windows application data database. On first database open, it creates a cryptographically random UUID v4 and stores it in SQLite table `local_identity`.
 - Tauri progress commands derive the learner ID inside Rust. The WebView does not send a learner ID to save, read, or list progress. The save input rejects unknown fields, including a supplied `learnerId`.
 - The WebView progress API in `packages/storage-web` calls the narrow Tauri commands when the native bridge is present. On first native use, prior IndexedDB lesson progress is imported once into SQLite in a single transaction and associated with the Rust-owned local identity; failed imports remain retryable. Ordinary web/PWA sessions continue to use IndexedDB.
-- SQLite schema v1 is migrated to v2. Existing v1 progress rows are retained; they are not automatically reassigned to the new local identity. Any future account-linking flow must define an explicit, reviewed reconciliation policy.
+- SQLite schema v1 is migrated to v2. Existing v1 progress rows are retained; they are not automatically reassigned to the new local identity. The local-data deletion command clears the current learner's SQLite progress and deletes the local identity row; a new UUID is generated on the next local storage use. Any future account-linking flow must define an explicit, reviewed reconciliation policy.
 - Rust tests cover UUID v4 generation and stability, migration preservation, identity-input rejection, learner isolation, upsert behavior, and progress restoration after closing and reopening the file-backed SQLite database.
 
 ## Explicit limitations of this stage
