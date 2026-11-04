@@ -455,6 +455,21 @@ fn import_legacy_lesson_progress(
     import_legacy_progress(&mut connection, &progress).map_err(|error| error.to_string())
 }
 
+fn require_legacy_progress_imported(connection: &Connection) -> rusqlite::Result<()> {
+    let imported: Option<i64> = connection
+        .query_row(
+            "SELECT indexeddb_progress_imported FROM local_identity WHERE singleton_id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if imported == Some(1) {
+        Ok(())
+    } else {
+        Err(rusqlite::Error::InvalidQuery)
+    }
+}
+
 fn clear_local_progress(connection: &mut Connection) -> rusqlite::Result<()> {
     let learner_id = get_or_create_local_learner_id(connection)?;
     let transaction = connection.transaction()?;
@@ -489,6 +504,7 @@ fn save_lesson_progress(
         .0
         .lock()
         .map_err(|_| "Local database lock is unavailable.".to_string())?;
+    require_legacy_progress_imported(&connection).map_err(|error| error.to_string())?;
     let learner_id =
         get_or_create_local_learner_id(&connection).map_err(|error| error.to_string())?;
     save_progress(&connection, &learner_id, &progress).map_err(|error| error.to_string())
@@ -503,6 +519,7 @@ fn read_lesson_progress(
         .0
         .lock()
         .map_err(|_| "Local database lock is unavailable.".to_string())?;
+    require_legacy_progress_imported(&connection).map_err(|error| error.to_string())?;
     let learner_id =
         get_or_create_local_learner_id(&connection).map_err(|error| error.to_string())?;
     read_progress(&connection, &learner_id, &lesson_id).map_err(|error| error.to_string())
@@ -516,6 +533,7 @@ fn list_lesson_progress(
         .0
         .lock()
         .map_err(|_| "Local database lock is unavailable.".to_string())?;
+    require_legacy_progress_imported(&connection).map_err(|error| error.to_string())?;
     let learner_id =
         get_or_create_local_learner_id(&connection).map_err(|error| error.to_string())?;
     list_progress(&connection, &learner_id).map_err(|error| error.to_string())
@@ -673,6 +691,19 @@ mod sqlite_tests {
             .unwrap()
             .unwrap();
         assert_eq!(still_restored.completed_step_ids, vec!["step-1", "step-2"]);
+    }
+
+    #[test]
+    fn native_progress_access_is_blocked_until_legacy_import_completes() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        initialize_database(&connection).unwrap();
+
+        assert!(require_legacy_progress_imported(&connection).is_err());
+        import_legacy_progress(&mut connection, &[]).unwrap();
+        assert!(require_legacy_progress_imported(&connection).is_ok());
+
+        clear_local_progress(&mut connection).unwrap();
+        assert!(require_legacy_progress_imported(&connection).is_err());
     }
 
     #[test]
