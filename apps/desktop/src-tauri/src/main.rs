@@ -450,7 +450,7 @@ mod sqlite_tests {
 
         assert!(save_progress(&connection, &sample_progress(" ", &[])).is_err());
         assert!(save_progress(&connection, &sample_progress(" learner-a", &[])).is_err());
-        assert!(save_progress(&connection, &sample_progress("learner-a\\n", &[])).is_err());
+        assert!(save_progress(&connection, &sample_progress("learner-a\n", &[])).is_err());
         assert!(save_progress(&connection, &sample_progress(&"x".repeat(129), &[])).is_err());
 
         let mut invalid = sample_progress("learner-a", &[]);
@@ -494,7 +494,7 @@ mod sqlite_tests {
         initialize_database(&connection).unwrap();
 
         assert!(read_progress(&connection, " ", "lesson-001").is_err());
-        assert!(read_progress(&connection, "learner-a", "lesson-001\\n").is_err());
+        assert!(read_progress(&connection, "learner-a", "lesson-001\n").is_err());
         assert!(list_progress(&connection, &"x".repeat(129)).is_err());
     }
 
