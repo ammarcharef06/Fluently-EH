@@ -472,9 +472,7 @@ fn require_legacy_progress_imported(connection: &Connection) -> rusqlite::Result
 
 fn clear_local_progress(connection: &mut Connection) -> rusqlite::Result<()> {
     let transaction = connection.transaction()?;
-    let learner_id = get_or_create_local_learner_id(&transaction)?;
-    // A local-data wipe must also remove preserved legacy rows that are no
-    // longer associated with the current local identity.
+    // A local-data wipe removes current and preserved legacy rows together.
     transaction.execute("DELETE FROM lesson_progress", [])?;
     transaction.execute(
         "DELETE FROM local_identity WHERE singleton_id = 1",
