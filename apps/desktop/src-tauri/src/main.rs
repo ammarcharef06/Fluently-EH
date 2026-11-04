@@ -416,8 +416,8 @@ fn import_legacy_progress(
         }
     }
 
-    let learner_id = get_or_create_local_learner_id(connection)?;
     let transaction = connection.transaction()?;
+    let learner_id = get_or_create_local_learner_id(&transaction)?;
     let already_imported: i64 = transaction.query_row(
         "SELECT indexeddb_progress_imported FROM local_identity WHERE singleton_id = 1",
         [],
@@ -471,8 +471,8 @@ fn require_legacy_progress_imported(connection: &Connection) -> rusqlite::Result
 }
 
 fn clear_local_progress(connection: &mut Connection) -> rusqlite::Result<()> {
-    let learner_id = get_or_create_local_learner_id(connection)?;
     let transaction = connection.transaction()?;
+    let learner_id = get_or_create_local_learner_id(&transaction)?;
     transaction.execute(
         "DELETE FROM lesson_progress WHERE learner_id = ?1",
         params![learner_id],
@@ -500,14 +500,16 @@ fn save_lesson_progress(
     database: tauri::State<'_, NativeDatabase>,
     progress: LessonProgressInput,
 ) -> Result<(), String> {
-    let connection = database
+    let mut connection = database
         .0
         .lock()
         .map_err(|_| "Local database lock is unavailable.".to_string())?;
-    require_legacy_progress_imported(&connection).map_err(|error| error.to_string())?;
+    let transaction = connection.transaction().map_err(|error| error.to_string())?;
+    require_legacy_progress_imported(&transaction).map_err(|error| error.to_string())?;
     let learner_id =
-        get_or_create_local_learner_id(&connection).map_err(|error| error.to_string())?;
-    save_progress(&connection, &learner_id, &progress).map_err(|error| error.to_string())
+        get_or_create_local_learner_id(&transaction).map_err(|error| error.to_string())?;
+    save_progress(&transaction, &learner_id, &progress).map_err(|error| error.to_string())?;
+    transaction.commit().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -515,28 +517,35 @@ fn read_lesson_progress(
     database: tauri::State<'_, NativeDatabase>,
     lesson_id: String,
 ) -> Result<Option<LessonProgress>, String> {
-    let connection = database
+    let mut connection = database
         .0
         .lock()
         .map_err(|_| "Local database lock is unavailable.".to_string())?;
-    require_legacy_progress_imported(&connection).map_err(|error| error.to_string())?;
+    let transaction = connection.transaction().map_err(|error| error.to_string())?;
+    require_legacy_progress_imported(&transaction).map_err(|error| error.to_string())?;
     let learner_id =
-        get_or_create_local_learner_id(&connection).map_err(|error| error.to_string())?;
-    read_progress(&connection, &learner_id, &lesson_id).map_err(|error| error.to_string())
+        get_or_create_local_learner_id(&transaction).map_err(|error| error.to_string())?;
+    let progress = read_progress(&transaction, &learner_id, &lesson_id)
+        .map_err(|error| error.to_string())?;
+    transaction.commit().map_err(|error| error.to_string())?;
+    Ok(progress)
 }
 
 #[tauri::command]
 fn list_lesson_progress(
     database: tauri::State<'_, NativeDatabase>,
 ) -> Result<Vec<LessonProgress>, String> {
-    let connection = database
+    let mut connection = database
         .0
         .lock()
         .map_err(|_| "Local database lock is unavailable.".to_string())?;
-    require_legacy_progress_imported(&connection).map_err(|error| error.to_string())?;
+    let transaction = connection.transaction().map_err(|error| error.to_string())?;
+    require_legacy_progress_imported(&transaction).map_err(|error| error.to_string())?;
     let learner_id =
-        get_or_create_local_learner_id(&connection).map_err(|error| error.to_string())?;
-    list_progress(&connection, &learner_id).map_err(|error| error.to_string())
+        get_or_create_local_learner_id(&transaction).map_err(|error| error.to_string())?;
+    let progress = list_progress(&transaction, &learner_id).map_err(|error| error.to_string())?;
+    transaction.commit().map_err(|error| error.to_string())?;
+    Ok(progress)
 }
 
 
