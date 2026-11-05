@@ -480,10 +480,7 @@ describe('Windows native progress bridge', () => {
       'import_legacy_lesson_progress',
       'save_lesson_progress'
     ]);
-    expect(wipeBridgeCalls).toEqual([
-      'import_legacy_lesson_progress',
-      'clear_local_learning_data'
-    ]);
+    expect(wipeBridgeCalls).toEqual(['clear_local_learning_data']);
   });
   it('lists current native learner progress without a webview identity argument', async () => {
     const invoke = vi.fn(async (command: string) => {
