@@ -16,7 +16,7 @@ export const LessonSchema = z.object({
   prerequisites: z.array(z.string()),
   estimatedMinutes: z.number().int().min(1).max(60),
   steps: z.array(LessonStepSchema).min(1),
-  status: z.enum(['draft', 'in_review', 'approved', 'published', 'retired']),
+  status: z.enum(['draft', 'in_review', 'changes_requested', 'approved', 'published', 'retired']),
   contentVersion: z.string().min(1),
   source: z.object({ kind: z.enum(['original', 'external']), note: z.string().min(1), license: z.string().min(1) }),
   review: z.object({ reviewerId: z.string().nullable(), reviewedAt: z.string().nullable(), approvalNote: z.string().nullable() })
