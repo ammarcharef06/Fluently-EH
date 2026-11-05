@@ -429,6 +429,62 @@ describe('Windows native progress bridge', () => {
     ]);
   });
 
+  it('resolves the native bridge when a queued local-data wipe begins', async () => {
+    let releaseFirstSave!: () => void;
+    let markFirstSaveStarted!: () => void;
+    const firstSaveStarted = new Promise<void>((resolve) => {
+      markFirstSaveStarted = resolve;
+    });
+    const firstSaveGate = new Promise<void>((resolve) => {
+      releaseFirstSave = resolve;
+    });
+    const firstBridgeCalls: string[] = [];
+    const firstBridge = vi.fn(async (command: string) => {
+      firstBridgeCalls.push(command);
+      if (command === 'import_legacy_lesson_progress') return true;
+      if (command === 'save_lesson_progress') {
+        markFirstSaveStarted();
+        await firstSaveGate;
+      }
+      return undefined;
+    });
+    Object.defineProperty(window, '__TAURI__', {
+      configurable: true,
+      value: { core: { invoke: firstBridge } }
+    });
+
+    const firstSave = saveLessonProgress({
+      lessonId: 'lesson-before-bridge-change',
+      completedStepIds: ['step-1'],
+      updatedAt: '2026-11-04T10:00:00Z',
+      contentVersion: 'content-1'
+    });
+    await firstSaveStarted;
+
+    const wipeBridgeCalls: string[] = [];
+    const wipeBridge = vi.fn(async (command: string) => {
+      wipeBridgeCalls.push(command);
+      if (command === 'import_legacy_lesson_progress') return true;
+      return undefined;
+    });
+    const wipe = clearLocalLearningData();
+    Object.defineProperty(window, '__TAURI__', {
+      configurable: true,
+      value: { core: { invoke: wipeBridge } }
+    });
+
+    releaseFirstSave();
+    await Promise.all([firstSave, wipe]);
+
+    expect(firstBridgeCalls).toEqual([
+      'import_legacy_lesson_progress',
+      'save_lesson_progress'
+    ]);
+    expect(wipeBridgeCalls).toEqual([
+      'import_legacy_lesson_progress',
+      'clear_local_learning_data'
+    ]);
+  });
   it('lists current native learner progress without a webview identity argument', async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === 'import_legacy_lesson_progress') return true;
