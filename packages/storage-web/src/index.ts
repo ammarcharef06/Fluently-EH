@@ -172,10 +172,11 @@ export async function readSetting(key: string): Promise<string | number | boolea
   });
 }
 export async function clearLocalLearningData(): Promise<void> {
-  const core = getNativeCore();
   const storeNames = ['progress', 'outbox', 'reviews', 'settings'] as const;
 
   await withStorageOperation(async () => {
+    // Resolve the bridge when this queued operation executes, not when it is enqueued.
+    const core = getNativeCore();
     const db = await openFluentlyDB();
     if (!core) {
       const tx = db.transaction(storeNames, 'readwrite');
