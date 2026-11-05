@@ -163,3 +163,60 @@ describe('package integrity', () => {
     expect(extra.ok).toBe(false);
   });
 });
+
+
+describe('lesson review lifecycle', () => {
+  const lesson = {
+    id: 'pre-a1.review-status-fixture',
+    type: 'lesson',
+    title: 'Review status fixture',
+    description: 'A minimal valid lesson for lifecycle schema tests.',
+    stage: 'pre-a1',
+    skills: ['grammar'],
+    objectives: [{ id: 'objective-1', description: 'Recognize the review lifecycle.' }],
+    prerequisites: [],
+    estimatedMinutes: 10,
+    steps: [{
+      id: 'step-1',
+      type: 'explanation',
+      heading: 'Review lifecycle',
+      body: 'This fixture is used only to validate the lesson schema.'
+    }],
+    contentVersion: '0.1.0',
+    source: {
+      kind: 'original',
+      note: 'Test fixture; not educational content.',
+      license: 'CC0-1.0'
+    },
+    review: {
+      reviewerId: null,
+      reviewedAt: null,
+      approvalNote: null
+    }
+  };
+
+  it('accepts every content lifecycle state defined by the content standards', async () => {
+    const { LessonSchema } = await import('./index');
+    const statuses = [
+      'draft',
+      'in_review',
+      'changes_requested',
+      'approved',
+      'published',
+      'retired'
+    ] as const;
+
+    for (const status of statuses) {
+      expect(LessonSchema.safeParse({ ...lesson, status }).success).toBe(true);
+    }
+  });
+
+  it('rejects unknown content lifecycle states', async () => {
+    const { LessonSchema } = await import('./index');
+
+    expect(LessonSchema.safeParse({
+      ...lesson,
+      status: 'changes-requested'
+    }).success).toBe(false);
+  });
+});
