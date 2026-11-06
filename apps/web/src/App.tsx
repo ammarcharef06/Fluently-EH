@@ -22,7 +22,7 @@ import { downloadAndActivateCurriculumZip } from '@fluently/storage-web/curricul
 import { syncPendingOperations } from '@fluently/storage-web/sync';
 
 type Screen = 'home' | 'path' | 'lesson' | 'review' | 'settings';
-const DEMO_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO !== 'false';
+const DEMO_ENABLED = import.meta.env.VITE_ENABLE_DEMO === 'true' || (import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO !== 'false');
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
@@ -88,6 +88,10 @@ function App() {
       const records = await listReviewStates().catch(() => []);
       if (!cancelled) setDueReviews(selectDueReviews(records));
     };
+    if (DEMO_ENABLED) {
+      void refresh();
+      return () => { cancelled = true; };
+    }
     const synchronize = async () => {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         if (!cancelled) setSyncStatus('offline');
@@ -260,13 +264,14 @@ function App() {
     });
     await enqueueOperation(reviewOperation);
     setDueReviews(selectDueReviews(await listReviewStates()));
-    if (typeof navigator !== 'undefined' && navigator.onLine) {
+    if (!DEMO_ENABLED && typeof navigator !== 'undefined' && navigator.onLine) {
       const result = await syncPendingOperations('/api');
       setSyncStatus(result.status);
     }
   }
 
   async function syncNow() {
+    if (DEMO_ENABLED) return;
     const result = await syncPendingOperations('/api');
     setSyncStatus(result.status);
     setDueReviews(selectDueReviews(await listReviewStates().catch(() => [])));
@@ -312,7 +317,7 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setScreen('home'); }}>
+        <a className="brand" href={import.meta.env.BASE_URL} onClick={(event) => { event.preventDefault(); setScreen('home'); }}>
           <span className="brand-mark"><GraduationCap size={25} /></span>
           <span><strong>{t.brand}</strong><small>{t.subtitle}</small></span>
         </a>
@@ -394,7 +399,7 @@ function App() {
               <div className="setting-row"><div><strong>{t.dark}</strong><small>{theme === 'light' ? t.light : t.dark}</small></div><button className="button button-secondary" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? t.dark : t.light}</button></div>
               <div className="setting-row"><div><strong>{t.storage}</strong><small>{isPersistent ? t.persistent : t.notPersistent}</small></div><span className="setting-check">{isPersistent ? <CheckCircle2 size={19} /> : <CircleHelp size={19} />}</span></div>
               <div className="setting-row"><div><strong>{t.syncStatus}</strong><small>{({ idle: t.syncIdle, empty: t.syncEmpty, offline: t.syncOffline, authentication_required: t.syncAuthenticationRequired, email_verification_required: t.syncEmailVerificationRequired, account_deletion_pending: t.syncAccountDeletionPending, service_unavailable: t.syncServiceUnavailable, invalid_response: t.syncInvalidResponse, network_error: t.syncNetworkError, synced: t.syncSynced } as Record<string, string>)[syncStatus] ?? syncStatus}</small></div><button className="button button-secondary" onClick={() => void syncNow()}>{t.syncNow}</button></div>
-              <div className="setting-row"><div><strong>{t.admin}</strong><small>/admin — {t.separateBuildTarget}</small></div><a className="button button-secondary" href="/admin/">{t.open}</a></div>
+              {!DEMO_ENABLED && <div className="setting-row"><div><strong>{t.admin}</strong><small>/admin — {t.separateBuildTarget}</small></div><a className="button button-secondary" href="/admin/">{t.open}</a></div>}
               <p className="privacy-note">{t.noMicrophone}</p>
             </div>
           </section>
