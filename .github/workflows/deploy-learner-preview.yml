@@ -1,0 +1,66 @@
+name: Deploy learner preview to GitHub Pages
+
+on:
+  push:
+    branches:
+      - implementation/full-build
+  pull_request:
+    branches:
+      - implementation/full-build
+    paths:
+      - ".github/workflows/deploy-learner-preview.yml"
+      - "apps/web/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: learner-preview-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22.16.0"
+          package-manager-cache: false
+
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@12.16.1
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build learner app for GitHub Pages preview
+        run: pnpm --filter @fluently/web build
+        env:
+          GITHUB_PAGES: "true"
+          VITE_ENABLE_DEMO: "true"
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name != 'pull_request'
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages
